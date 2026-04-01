@@ -142,10 +142,10 @@ Seuil configuré à 95/15min et 950/jour pour garder une marge.
 - [x] Next.js : affichage de tous les tracés GPS (polylines)
 - [x] Next.js : UX (couleur, opacité, zoom automatique sur les tracks)
 
-### Phase 6 — Polish
-- [ ] Gestion des erreurs et retry sur l'import
-- [ ] Re-sync partiel (nouvelles activités uniquement)
-- [ ] Support multi-utilisateurs (isolation des données)
+### Phase 6 — Polish ✅
+- [x] Gestion des erreurs et retry sur l'import
+- [x] Re-sync partiel (nouvelles activités uniquement)
+- [x] Support multi-utilisateurs (isolation des données)
 
 ### Phase 7 — Feature "% de ville exploré" (futur)
 - [ ] Installer PostGIS sur le serveur cible

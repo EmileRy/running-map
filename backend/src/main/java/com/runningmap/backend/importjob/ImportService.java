@@ -58,13 +58,20 @@ public class ImportService {
         importJobRepository.save(job);
 
         try {
-            List<StravaActivitySummary> allRuns = fetchAllRuns(user, job);
+            // Re-sync partiel : on ne fetche Strava qu'à partir de la dernière activité connue
+            LocalDateTime since = activityRepository.findMaxStartDateByUserId(userId).orElse(null);
+            if (since != null) {
+                log.info("Partial re-sync for user {} after {}", userId, since);
+            }
+
+            List<StravaActivitySummary> allRuns = fetchAllRuns(user, job, since);
             processRuns(allRuns, user, job);
 
             job.setStatus(ImportStatus.DONE);
             job.setCompletedAt(LocalDateTime.now());
             importJobRepository.save(job);
-            log.info("Import done for user {}: {} activities", userId, job.getProcessedActivities());
+            log.info("Import done for user {}: {}/{} activities processed",
+                    userId, job.getProcessedActivities(), job.getTotalActivities());
 
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -75,19 +82,19 @@ public class ImportService {
         }
     }
 
-    private List<StravaActivitySummary> fetchAllRuns(User user, ImportJob job) throws InterruptedException {
+    private List<StravaActivitySummary> fetchAllRuns(User user, ImportJob job, LocalDateTime since)
+            throws InterruptedException {
         List<StravaActivitySummary> allRuns = new ArrayList<>();
         int page = 1;
 
         while (true) {
-            List<StravaActivitySummary> page_result = stravaApiClient.getActivities(user, page);
-            if (page_result.isEmpty()) break;
+            List<StravaActivitySummary> pageResult = stravaApiClient.getActivities(user, page, since);
+            if (pageResult.isEmpty()) break;
 
-            List<StravaActivitySummary> runs = page_result.stream().filter(StravaActivitySummary::isRun).toList();
-            allRuns.addAll(runs);
+            allRuns.addAll(pageResult.stream().filter(StravaActivitySummary::isRun).toList());
             page++;
 
-            if (page_result.size() < 200) break;
+            if (pageResult.size() < 200) break;
         }
 
         job.setTotalActivities(allRuns.size());
@@ -95,34 +102,38 @@ public class ImportService {
         return allRuns;
     }
 
-    private void processRuns(List<StravaActivitySummary> runs, User user, ImportJob job)
-            throws InterruptedException, JsonProcessingException {
-
+    private void processRuns(List<StravaActivitySummary> runs, User user, ImportJob job) {
         for (StravaActivitySummary summary : runs) {
-            if (activityRepository.existsByUserIdAndStravaActivityId(user.getId(), summary.id())) {
+            try {
+                processSingleRun(summary, user);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException("Import interrompu", e);
+            } catch (Exception e) {
+                log.warn("Skipping activity {} for user {} due to error: {}", summary.id(), user.getId(), e.getMessage());
+            } finally {
                 job.setProcessedActivities(job.getProcessedActivities() + 1);
                 importJobRepository.save(job);
-                continue;
             }
-
-            Optional<List<List<Double>>> stream = stravaApiClient.getLatlngStream(user, summary.id());
-            if (stream.isEmpty()) {
-                job.setProcessedActivities(job.getProcessedActivities() + 1);
-                importJobRepository.save(job);
-                continue;
-            }
-
-            Activity activity = new Activity();
-            activity.setUserId(user.getId());
-            activity.setStravaActivityId(summary.id());
-            activity.setName(summary.name());
-            activity.setStartDate(parseDate(summary.startDate()));
-            activity.setLatlngStream(objectMapper.writeValueAsString(stream.get()));
-            activityRepository.save(activity);
-
-            job.setProcessedActivities(job.getProcessedActivities() + 1);
-            importJobRepository.save(job);
         }
+    }
+
+    private void processSingleRun(StravaActivitySummary summary, User user)
+            throws InterruptedException, JsonProcessingException {
+        if (activityRepository.existsByUserIdAndStravaActivityId(user.getId(), summary.id())) {
+            return;
+        }
+
+        Optional<List<List<Double>>> stream = stravaApiClient.getLatlngStream(user, summary.id());
+        if (stream.isEmpty()) return;
+
+        Activity activity = new Activity();
+        activity.setUserId(user.getId());
+        activity.setStravaActivityId(summary.id());
+        activity.setName(summary.name());
+        activity.setStartDate(parseDate(summary.startDate()));
+        activity.setLatlngStream(objectMapper.writeValueAsString(stream.get()));
+        activityRepository.save(activity);
     }
 
     private void failJob(ImportJob job, String message) {
