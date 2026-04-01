@@ -133,9 +133,9 @@ Seuil configuré à 95/15min et 950/jour pour garder une marge.
 - [x] Spring Boot : refresh token automatique avant chaque appel Strava
 - [x] Next.js : déclenchement de l'import + barre de progression (polling)
 
-### Phase 4 — API tracks
-- [ ] Spring Boot : endpoint `GET /api/tracks` (retourne les coordonnées compressées)
-- [ ] Optimisation : pagination ou streaming si > 1000 activités
+### Phase 4 — API tracks ✅
+- [x] Spring Boot : endpoint `GET /api/tracks` (retourne les coordonnées compressées)
+- [x] Optimisation : pagination ou streaming si > 1000 activités
 
 ### Phase 5 — Carte
 - [ ] Next.js : intégration Leaflet (SSR disabled)
