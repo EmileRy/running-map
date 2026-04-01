@@ -117,21 +117,21 @@ Seuil configuré à 95/15min et 950/jour pour garder une marge.
 - [x] Migration Flyway `V1__init.sql`
 - [x] Projet Next.js (TypeScript, Tailwind, App Router, Leaflet)
 
-### Phase 2 — Auth
-- [ ] Spring Boot : endpoint `GET /api/auth/strava` (redirect OAuth)
-- [ ] Spring Boot : endpoint `GET /api/auth/callback` (échange du code, stockage token, émission JWT)
-- [ ] Spring Boot : filtre JWT (`OncePerRequestFilter`) + config Spring Security
-- [ ] Spring Boot : endpoint `GET /api/auth/me`
-- [ ] Spring Boot : refresh automatique du token Strava (expire après 6h)
-- [ ] Next.js : page de login avec bouton "Se connecter avec Strava"
-- [ ] Next.js : gestion du callback et stockage du JWT
+### Phase 2 — Auth ✅
+- [x] Spring Boot : endpoint `GET /api/auth/strava` (redirect OAuth)
+- [x] Spring Boot : endpoint `GET /api/auth/callback` (échange du code, stockage token, émission JWT)
+- [x] Spring Boot : filtre JWT (`OncePerRequestFilter`) + config Spring Security
+- [x] Spring Boot : endpoint `GET /api/auth/me`
+- [x] Spring Boot : refresh automatique du token Strava (expire après 6h)
+- [x] Next.js : page de login avec bouton "Se connecter avec Strava"
+- [x] Next.js : gestion du callback et stockage du JWT
 
-### Phase 3 — Import
-- [ ] Spring Boot : `StravaApiClient` (WebClient, rate limiter sliding window)
-- [ ] Spring Boot : `ImportService` avec `@Async` + file FIFO
-- [ ] Spring Boot : endpoints `/api/import/start` et `/api/import/status`
-- [ ] Spring Boot : refresh token automatique avant chaque appel Strava
-- [ ] Next.js : déclenchement de l'import + barre de progression (polling)
+### Phase 3 — Import ✅
+- [x] Spring Boot : `StravaApiClient` (WebClient, rate limiter sliding window)
+- [x] Spring Boot : `ImportService` avec `@Async` + file FIFO
+- [x] Spring Boot : endpoints `/api/import/start` et `/api/import/status`
+- [x] Spring Boot : refresh token automatique avant chaque appel Strava
+- [x] Next.js : déclenchement de l'import + barre de progression (polling)
 
 ### Phase 4 — API tracks
 - [ ] Spring Boot : endpoint `GET /api/tracks` (retourne les coordonnées compressées)
