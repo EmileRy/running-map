@@ -34,5 +34,5 @@ export async function GET(request: NextRequest) {
     path: '/',
   })
 
-  redirect('/')
+  redirect('/map')
 }

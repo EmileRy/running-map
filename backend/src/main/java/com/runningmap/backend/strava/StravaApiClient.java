@@ -89,8 +89,8 @@ public class StravaApiClient {
 
         return streams.stream()
                 .filter(s -> "latlng".equals(s.type()))
-                .map(StravaStreamResponse::data)
-                .filter(d -> d != null && !d.isEmpty())
+                .map(StravaStreamResponse::asLatlng)
+                .filter(d -> !d.isEmpty())
                 .findFirst();
     }
 

@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/auth'
-import { MapView } from '@/components/MapView'
+import { MapLayout } from '@/components/MapLayout'
 
 interface Track {
   id: string
@@ -45,19 +45,5 @@ export default async function MapPage() {
   const tracks = await fetchAllTracks(token)
   const tracksWithCoords = tracks.filter((t) => t.coordinates?.length >= 2)
 
-  return (
-    <div className="flex flex-1 flex-col min-h-0">
-      <header className="flex items-center justify-between px-4 py-3 bg-zinc-900 text-white shrink-0">
-        <a href="/" className="font-semibold hover:text-zinc-300 transition-colors">
-          Running Map
-        </a>
-        <span className="text-sm text-zinc-400">
-          {user.firstname} {user.lastname}
-        </span>
-      </header>
-      <div className="flex-1 min-h-0">
-        <MapView tracks={tracksWithCoords} runCount={tracksWithCoords.length} />
-      </div>
-    </div>
-  )
+  return <MapLayout user={user} tracks={tracksWithCoords} />
 }

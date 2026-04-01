@@ -17,6 +17,7 @@ public class StravaProperties {
     private String tokenUrl;
     private String apiBaseUrl;
     private RateLimit rateLimit = new RateLimit();
+    private int maxActivitiesPerImport = 0; // 0 = illimité
 
     @Getter
     @Setter

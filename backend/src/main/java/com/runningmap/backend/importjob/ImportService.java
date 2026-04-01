@@ -6,6 +6,7 @@ import com.runningmap.backend.activity.Activity;
 import com.runningmap.backend.activity.ActivityRepository;
 import com.runningmap.backend.auth.User;
 import com.runningmap.backend.auth.UserRepository;
+import com.runningmap.backend.config.StravaProperties;
 import com.runningmap.backend.strava.StravaActivitySummary;
 import com.runningmap.backend.strava.StravaApiClient;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,7 @@ public class ImportService {
     private final UserRepository userRepository;
     private final StravaApiClient stravaApiClient;
     private final ObjectMapper objectMapper;
+    private final StravaProperties stravaProperties;
 
     public ImportJob startImport(UUID userId) {
         if (importJobRepository.existsByUserIdAndStatusIn(userId, List.of(ImportStatus.PENDING, ImportStatus.RUNNING))) {
@@ -87,12 +89,19 @@ public class ImportService {
         List<StravaActivitySummary> allRuns = new ArrayList<>();
         int page = 1;
 
+        int maxActivities = stravaProperties.getMaxActivitiesPerImport();
+
         while (true) {
             List<StravaActivitySummary> pageResult = stravaApiClient.getActivities(user, page, since);
             if (pageResult.isEmpty()) break;
 
             allRuns.addAll(pageResult.stream().filter(StravaActivitySummary::isRun).toList());
             page++;
+
+            if (maxActivities > 0 && allRuns.size() >= maxActivities) {
+                allRuns = allRuns.subList(0, maxActivities);
+                break;
+            }
 
             if (pageResult.size() < 200) break;
         }
