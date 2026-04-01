@@ -87,8 +87,8 @@ export function MapLayout({ user, tracks }: { user: User; tracks: Track[] }) {
         </div>
       </header>
 
-      {/* Map */}
-      <div className="flex-1 min-h-0">
+      {/* Map — isolate confine les z-indexes internes de Leaflet (200-800) dans ce contexte */}
+      <div className="flex-1 min-h-0 isolate">
         <MapView tracks={tracks} runCount={tracks.length} />
       </div>
 
