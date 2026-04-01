@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { MapView } from './MapView'
-import { ImportPanel } from './ImportPanel'
+import { ImportPanel, type ImportJob } from './ImportPanel'
 
 interface User {
   firstname: string
@@ -17,11 +18,26 @@ interface Track {
 }
 
 export function MapLayout({ user, tracks }: { user: User; tracks: Track[] }) {
+  const router = useRouter()
   const [menuOpen, setMenuOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
+  const [importJob, setImportJob] = useState<ImportJob | null>(null)
+  const [importLoading, setImportLoading] = useState(false)
+  const prevStatusRef = useRef<string | null | undefined>(undefined)
   const menuRef = useRef<HTMLDivElement>(null)
 
-  // Ferme le menu si clic en dehors
+  const isImporting = importLoading || importJob?.status === 'RUNNING' || importJob?.status === 'PENDING'
+
+  const handleStatusChange = useCallback((job: ImportJob | null) => {
+    const prevStatus = prevStatusRef.current
+    prevStatusRef.current = job?.status ?? null
+    setImportJob(job)
+
+    if (prevStatus === 'RUNNING' && job?.status === 'DONE') {
+      router.refresh()
+    }
+  }, [router])
+
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
@@ -36,7 +52,22 @@ export function MapLayout({ user, tracks }: { user: User; tracks: Track[] }) {
     <div className="flex flex-1 flex-col min-h-0">
       {/* Header */}
       <header className="flex items-center justify-between px-4 py-3 bg-zinc-900 text-white shrink-0 z-10">
-        <span className="font-semibold tracking-tight">Running Map</span>
+        <div className="flex items-center gap-3">
+          <span className="font-semibold tracking-tight">Running Map</span>
+          {isImporting && (
+            <div className="flex items-center gap-2 rounded-full bg-zinc-800 px-3 py-1">
+              <svg className="h-3.5 w-3.5 animate-spin text-[#FC4C02]" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              <span className="text-xs text-zinc-400">
+                {importJob.totalActivities > 0
+                  ? `${importJob.processedActivities} / ${importJob.totalActivities}`
+                  : 'Import…'}
+              </span>
+            </div>
+          )}
+        </div>
 
         {/* User menu */}
         <div className="relative" ref={menuRef}>
@@ -45,11 +76,7 @@ export function MapLayout({ user, tracks }: { user: User; tracks: Track[] }) {
             className="flex items-center gap-2 rounded-full px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-800 transition-colors"
           >
             {user.profilePicture && (
-              <img
-                src={user.profilePicture}
-                alt=""
-                className="h-6 w-6 rounded-full object-cover"
-              />
+              <img src={user.profilePicture} alt="" className="h-6 w-6 rounded-full object-cover" />
             )}
             <span>{user.firstname} {user.lastname}</span>
             <svg className={`h-3.5 w-3.5 transition-transform ${menuOpen ? 'rotate-180' : ''}`} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2">
@@ -87,7 +114,7 @@ export function MapLayout({ user, tracks }: { user: User; tracks: Track[] }) {
         </div>
       </header>
 
-      {/* Map — isolate confine les z-indexes internes de Leaflet (200-800) dans ce contexte */}
+      {/* Map */}
       <div className="flex-1 min-h-0 isolate">
         <MapView tracks={tracks} runCount={tracks.length} />
       </div>
@@ -115,13 +142,11 @@ export function MapLayout({ user, tracks }: { user: User; tracks: Track[] }) {
                 </svg>
               </button>
             </div>
-
             <p className="mb-6 text-sm text-zinc-400">
               Lance la synchronisation de tes activités Strava. Seules les nouvelles courses seront téléchargées.
             </p>
-
             <div className="flex justify-center">
-              <ImportPanel />
+              <ImportPanel onStatusChange={handleStatusChange} onLoadingChange={setImportLoading} />
             </div>
           </div>
         </div>

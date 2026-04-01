@@ -60,13 +60,7 @@ public class ImportService {
         importJobRepository.save(job);
 
         try {
-            // Re-sync partiel : on ne fetche Strava qu'à partir de la dernière activité connue
-            LocalDateTime since = activityRepository.findMaxStartDateByUserId(userId).orElse(null);
-            if (since != null) {
-                log.info("Partial re-sync for user {} after {}", userId, since);
-            }
-
-            List<StravaActivitySummary> allRuns = fetchAllRuns(user, job, since);
+            List<StravaActivitySummary> allRuns = fetchAllRuns(user, job);
             processRuns(allRuns, user, job);
 
             job.setStatus(ImportStatus.DONE);
@@ -84,7 +78,7 @@ public class ImportService {
         }
     }
 
-    private List<StravaActivitySummary> fetchAllRuns(User user, ImportJob job, LocalDateTime since)
+    private List<StravaActivitySummary> fetchAllRuns(User user, ImportJob job)
             throws InterruptedException {
         List<StravaActivitySummary> allRuns = new ArrayList<>();
         int page = 1;
@@ -92,7 +86,7 @@ public class ImportService {
         int maxActivities = stravaProperties.getMaxActivitiesPerImport();
 
         while (true) {
-            List<StravaActivitySummary> pageResult = stravaApiClient.getActivities(user, page, since);
+            List<StravaActivitySummary> pageResult = stravaApiClient.getActivities(user, page, null);
             if (pageResult.isEmpty()) break;
 
             allRuns.addAll(pageResult.stream().filter(StravaActivitySummary::isRun).toList());
