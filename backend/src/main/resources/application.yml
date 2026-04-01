@@ -1,0 +1,38 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:running_map}
+    username: ${DB_USER:running_map}
+    password: ${DB_PASSWORD:running_map}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+server:
+  port: 8080
+
+strava:
+  client-id: ${STRAVA_CLIENT_ID}
+  client-secret: ${STRAVA_CLIENT_SECRET}
+  redirect-uri: ${STRAVA_REDIRECT_URI:http://localhost:3000/auth/callback}
+  auth-url: https://www.strava.com/oauth/authorize
+  token-url: https://www.strava.com/oauth/token
+  api-base-url: https://www.strava.com/api/v3
+  rate-limit:
+    requests-per-15min: 95
+    requests-per-day: 950
+
+jwt:
+  secret: ${JWT_SECRET}
+  expiration-ms: 86400000 # 24h
+
+app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
