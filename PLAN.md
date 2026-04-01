@@ -137,10 +137,10 @@ Seuil configuré à 95/15min et 950/jour pour garder une marge.
 - [x] Spring Boot : endpoint `GET /api/tracks` (retourne les coordonnées compressées)
 - [x] Optimisation : pagination ou streaming si > 1000 activités
 
-### Phase 5 — Carte
-- [ ] Next.js : intégration Leaflet (SSR disabled)
-- [ ] Next.js : affichage de tous les tracés GPS (polylines)
-- [ ] Next.js : UX (couleur, opacité, zoom automatique sur les tracks)
+### Phase 5 — Carte ✅
+- [x] Next.js : intégration Leaflet (SSR disabled)
+- [x] Next.js : affichage de tous les tracés GPS (polylines)
+- [x] Next.js : UX (couleur, opacité, zoom automatique sur les tracks)
 
 ### Phase 6 — Polish
 - [ ] Gestion des erreurs et retry sur l'import
