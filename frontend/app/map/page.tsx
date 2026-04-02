@@ -3,36 +3,20 @@ import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/auth'
 import { MapLayout } from '@/components/MapLayout'
 
-interface Track {
+interface Street {
   id: string
-  name: string
+  name: string | null
   coordinates: number[][]
 }
 
-interface TracksPage {
-  content: Track[]
-  last: boolean
-}
-
-async function fetchAllTracks(token: string): Promise<Track[]> {
+async function fetchCoveredStreets(token: string): Promise<Street[]> {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
-  const all: Track[] = []
-  let page = 0
-
-  while (true) {
-    const res = await fetch(`${apiUrl}/api/tracks?page=${page}&size=100`, {
-      headers: { Authorization: `Bearer ${token}` },
-      cache: 'no-store',
-    })
-    if (!res.ok) break
-
-    const data: TracksPage = await res.json()
-    all.push(...data.content)
-    if (data.last) break
-    page++
-  }
-
-  return all
+  const res = await fetch(`${apiUrl}/api/streets/covered`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  })
+  if (!res.ok) return []
+  return res.json()
 }
 
 export default async function MapPage() {
@@ -42,8 +26,8 @@ export default async function MapPage() {
   const cookieStore = await cookies()
   const token = cookieStore.get('auth_token')?.value ?? ''
 
-  const tracks = await fetchAllTracks(token)
-  const tracksWithCoords = tracks.filter((t) => t.coordinates?.length >= 2)
+  const streets = await fetchCoveredStreets(token)
+  const streetsWithCoords = streets.filter((s) => s.coordinates?.length >= 2)
 
-  return <MapLayout user={user} tracks={tracksWithCoords} />
+  return <MapLayout user={user} tracks={streetsWithCoords} />
 }

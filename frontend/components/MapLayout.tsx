@@ -13,7 +13,7 @@ interface User {
 
 interface Track {
   id: string
-  name: string
+  name: string | null
   coordinates: number[][]
 }
 
@@ -61,7 +61,7 @@ export function MapLayout({ user, tracks }: { user: User; tracks: Track[] }) {
                 <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
               <span className="text-xs text-zinc-400">
-                {importJob.totalActivities > 0
+                {importJob && importJob.totalActivities > 0
                   ? `${importJob.processedActivities} / ${importJob.totalActivities}`
                   : 'Import…'}
               </span>

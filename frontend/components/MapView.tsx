@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic'
 
 interface Track {
   id: string
-  name: string
+  name: string | null
   coordinates: number[][]
 }
 
@@ -22,7 +22,7 @@ export function MapView({ tracks, runCount }: { tracks: Track[]; runCount: numbe
     <div className="relative h-full w-full">
       <LeafletMap tracks={tracks} />
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[1000] rounded-full bg-black/60 px-4 py-2 text-sm text-white backdrop-blur-sm pointer-events-none">
-        {runCount} course{runCount > 1 ? 's' : ''}
+        {runCount} rue{runCount > 1 ? 's' : ''} couvertes
       </div>
     </div>
   )

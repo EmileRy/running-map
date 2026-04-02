@@ -9,6 +9,7 @@ import com.runningmap.backend.auth.UserRepository;
 import com.runningmap.backend.config.StravaProperties;
 import com.runningmap.backend.strava.StravaActivitySummary;
 import com.runningmap.backend.strava.StravaApiClient;
+import com.runningmap.backend.streets.StreetCoverageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -32,6 +33,7 @@ public class ImportService {
     private final StravaApiClient stravaApiClient;
     private final ObjectMapper objectMapper;
     private final StravaProperties stravaProperties;
+    private final StreetCoverageService streetCoverageService;
 
     public ImportJob startImport(UUID userId) {
         if (importJobRepository.existsByUserIdAndStatusIn(userId, List.of(ImportStatus.PENDING, ImportStatus.RUNNING))) {
@@ -68,6 +70,12 @@ public class ImportService {
             importJobRepository.save(job);
             log.info("Import done for user {}: {}/{} activities processed",
                     userId, job.getProcessedActivities(), job.getTotalActivities());
+
+            try {
+                streetCoverageService.computeCoverageForUser(userId);
+            } catch (Exception e) {
+                log.error("Street coverage computation failed for user {}", userId, e);
+            }
 
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

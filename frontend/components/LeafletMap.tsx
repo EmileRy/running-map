@@ -6,7 +6,7 @@ import 'leaflet/dist/leaflet.css'
 
 interface Track {
   id: string
-  name: string
+  name: string | null
   coordinates: number[][]
 }
 
