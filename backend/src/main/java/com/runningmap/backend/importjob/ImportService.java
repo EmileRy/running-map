@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Async;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -38,20 +39,30 @@ public class ImportService {
     private final JdbcTemplate jdbcTemplate;
 
     public ImportJob startImport(UUID userId) {
-        if (importJobRepository.existsByUserIdAndStatusIn(userId, List.of(ImportStatus.PENDING, ImportStatus.RUNNING))) {
+        if (importJobRepository.existsByUserIdAndStatusIn(userId,
+                List.of(ImportStatus.PENDING, ImportStatus.RUNNING, ImportStatus.COMPUTING_STREETS))) {
             return importJobRepository.findTopByUserIdOrderByCreatedAtDesc(userId).orElseThrow();
         }
 
         ImportJob job = new ImportJob();
         job.setUserId(userId);
-        job = importJobRepository.save(job);
+        return importJobRepository.save(job);
+    }
 
-        runImportAsync(job.getId(), userId);
-        return job;
+    @Scheduled(fixedDelay = 3000)
+    public void processQueue() {
+        if (importJobRepository.existsByStatusIn(
+                List.of(ImportStatus.RUNNING, ImportStatus.COMPUTING_STREETS))) return;
+        importJobRepository.findFirstByStatusOrderByCreatedAtAsc(ImportStatus.PENDING)
+                .ifPresent(job -> runImportAsync(job.getId(), job.getUserId()));
     }
 
     public Optional<ImportJob> getLatestJob(UUID userId) {
         return importJobRepository.findTopByUserIdOrderByCreatedAtDesc(userId);
+    }
+
+    public long getQueuePosition(ImportJob job) {
+        return importJobRepository.countByStatusAndCreatedAtBefore(ImportStatus.PENDING, job.getCreatedAt());
     }
 
     @Async
@@ -67,17 +78,21 @@ public class ImportService {
             List<StravaActivitySummary> allRuns = fetchAllRuns(user, job);
             processRuns(allRuns, user, job);
 
-            job.setStatus(ImportStatus.DONE);
-            job.setCompletedAt(LocalDateTime.now());
-            importJobRepository.save(job);
             log.info("Import done for user {}: {}/{} activities processed",
                     userId, job.getProcessedActivities(), job.getTotalActivities());
+
+            job.setStatus(ImportStatus.COMPUTING_STREETS);
+            importJobRepository.save(job);
 
             try {
                 streetCoverageService.computeCoverageForUser(userId);
             } catch (Exception e) {
                 log.error("Street coverage computation failed for user {}", userId, e);
             }
+
+            job.setStatus(ImportStatus.DONE);
+            job.setCompletedAt(LocalDateTime.now());
+            importJobRepository.save(job);
 
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -168,6 +183,8 @@ public class ImportService {
             "WHERE id = ? AND jsonb_array_length(latlng_stream) >= 2",
             saved.getId()
         );
+
+        streetCoverageService.computeCoverageForActivity(saved.getId(), user.getId());
     }
 
     private void failJob(ImportJob job, String message) {

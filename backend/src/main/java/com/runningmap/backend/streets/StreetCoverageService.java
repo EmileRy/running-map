@@ -19,6 +19,24 @@ public class StreetCoverageService {
 
     private final JdbcTemplate jdbcTemplate;
 
+    public void computeCoverageForActivity(UUID activityId, UUID userId) {
+        int inserted = jdbcTemplate.update(
+            "INSERT INTO covered_streets (user_id, street_id) " +
+            "SELECT DISTINCT ?, s.id " +
+            "FROM (SELECT id, track_geom, ST_Buffer(track_geom_simplified, ?) AS track_buffer" +
+            "      FROM activities WHERE id = ? AND track_geom IS NOT NULL) a " +
+            "JOIN osm_streets s ON ST_DWithin(s.geom, a.track_geom, ?) " +
+            "WHERE ST_Length(ST_Intersection(a.track_buffer, s.geom)) * 111320 >= ? " +
+            "ON CONFLICT DO NOTHING",
+            userId, BUFFER_DEGREES, activityId, BUFFER_DEGREES, MIN_COVERED_METERS
+        );
+        jdbcTemplate.update(
+            "UPDATE activities SET streets_computed_at = NOW() WHERE id = ?",
+            activityId
+        );
+        log.debug("Activity {}: {} new street mappings", activityId, inserted);
+    }
+
     public void computeCoverageForUser(UUID userId) {
         log.info("Computing street coverage for user {}", userId);
 
