@@ -12,6 +12,7 @@ import com.runningmap.backend.strava.StravaApiClient;
 import com.runningmap.backend.streets.StreetCoverageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -34,6 +35,7 @@ public class ImportService {
     private final ObjectMapper objectMapper;
     private final StravaProperties stravaProperties;
     private final StreetCoverageService streetCoverageService;
+    private final JdbcTemplate jdbcTemplate;
 
     public ImportJob startImport(UUID userId) {
         if (importJobRepository.existsByUserIdAndStatusIn(userId, List.of(ImportStatus.PENDING, ImportStatus.RUNNING))) {
@@ -132,19 +134,34 @@ public class ImportService {
     private void processSingleRun(StravaActivitySummary summary, User user)
             throws InterruptedException, JsonProcessingException {
         if (activityRepository.existsByUserIdAndStravaActivityId(user.getId(), summary.id())) {
+            log.debug("Skipping already imported activity: \"{}\" (Strava ID: {})", summary.name(), summary.id());
             return;
         }
 
+        log.debug("Fetching GPS stream for: \"{}\" (Strava ID: {})", summary.name(), summary.id());
         Optional<List<List<Double>>> stream = stravaApiClient.getLatlngStream(user, summary.id());
-        if (stream.isEmpty()) return;
+        if (stream.isEmpty()) {
+            log.debug("No GPS stream for: \"{}\" (Strava ID: {})", summary.name(), summary.id());
+            return;
+        }
 
+        log.debug("Saving activity: \"{}\" (Strava ID: {}, {} GPS points)",
+                summary.name(), summary.id(), stream.get().size());
         Activity activity = new Activity();
         activity.setUserId(user.getId());
         activity.setStravaActivityId(summary.id());
         activity.setName(summary.name());
         activity.setStartDate(parseDate(summary.startDate()));
         activity.setLatlngStream(objectMapper.writeValueAsString(stream.get()));
-        activityRepository.save(activity);
+        Activity saved = activityRepository.save(activity);
+
+        jdbcTemplate.update(
+            "UPDATE activities SET track_geom = ST_MakeLine(" +
+            "  array(SELECT ST_SetSRID(ST_MakePoint((c->>1)::float, (c->>0)::float), 4326)" +
+            "        FROM jsonb_array_elements(latlng_stream) c)" +
+            ") WHERE id = ? AND jsonb_array_length(latlng_stream) >= 2",
+            saved.getId()
+        );
     }
 
     private void failJob(ImportJob job, String message) {
