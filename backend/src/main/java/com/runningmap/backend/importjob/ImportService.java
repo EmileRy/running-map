@@ -156,10 +156,16 @@ public class ImportService {
         Activity saved = activityRepository.save(activity);
 
         jdbcTemplate.update(
-            "UPDATE activities SET track_geom = ST_MakeLine(" +
-            "  array(SELECT ST_SetSRID(ST_MakePoint((c->>1)::float, (c->>0)::float), 4326)" +
-            "        FROM jsonb_array_elements(latlng_stream) c)" +
-            ") WHERE id = ? AND jsonb_array_length(latlng_stream) >= 2",
+            "UPDATE activities SET " +
+            "  track_geom = ST_MakeLine(" +
+            "    array(SELECT ST_SetSRID(ST_MakePoint((c->>1)::float, (c->>0)::float), 4326)" +
+            "          FROM jsonb_array_elements(latlng_stream) c)" +
+            ")," +
+            "  track_geom_simplified = ST_Simplify(ST_MakeLine(" +
+            "    array(SELECT ST_SetSRID(ST_MakePoint((c->>1)::float, (c->>0)::float), 4326)" +
+            "          FROM jsonb_array_elements(latlng_stream) c)" +
+            "), 0.0001) " +
+            "WHERE id = ? AND jsonb_array_length(latlng_stream) >= 2",
             saved.getId()
         );
     }

@@ -28,7 +28,7 @@ strava:
   rate-limit:
     requests-per-15min: 95
     requests-per-day: 950
-  max-activities-per-import: 100 # 0 = illimité
+  max-activities-per-import: 150 # 0 = illimité
 
 jwt:
   secret: ${JWT_SECRET}
