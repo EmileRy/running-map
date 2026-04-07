@@ -23,6 +23,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -92,7 +93,13 @@ public class ImportService {
 
         try {
             List<StravaActivitySummary> allRuns = fetchAllRuns(user, job);
-            processRuns(allRuns, user, job);
+
+            Set<Long> zoneRecomputeSet = streetCoverageService.findStravaIdsNeedingZoneRecomputation(userId);
+            if (!zoneRecomputeSet.isEmpty()) {
+                log.info("Found {} existing activities to recompute for new zones", zoneRecomputeSet.size());
+            }
+
+            processRuns(allRuns, user, job, zoneRecomputeSet);
 
             log.info("Import done for user {}: {}/{} activities processed",
                     userId, job.getProcessedActivities(), job.getTotalActivities());
@@ -146,10 +153,10 @@ public class ImportService {
         return allRuns;
     }
 
-    private void processRuns(List<StravaActivitySummary> runs, User user, ImportJob job) {
+    private void processRuns(List<StravaActivitySummary> runs, User user, ImportJob job, Set<Long> zoneRecomputeSet) {
         for (StravaActivitySummary summary : runs) {
             try {
-                processSingleRun(summary, user);
+                processSingleRun(summary, user, zoneRecomputeSet);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 throw new RuntimeException("Import interrompu", e);
@@ -162,10 +169,15 @@ public class ImportService {
         }
     }
 
-    private void processSingleRun(StravaActivitySummary summary, User user)
+    private void processSingleRun(StravaActivitySummary summary, User user, Set<Long> zoneRecomputeSet)
             throws InterruptedException, JsonProcessingException {
         if (activityRepository.existsByUserIdAndStravaActivityId(user.getId(), summary.id())) {
-            log.debug("Skipping already imported activity: \"{}\" (Strava ID: {})", summary.name(), summary.id());
+            if (zoneRecomputeSet.contains(summary.id())) {
+                activityRepository.findByUserIdAndStravaActivityId(user.getId(), summary.id())
+                    .ifPresent(a -> streetCoverageService.computeCoverageForActivityNewZones(a.getId()));
+            } else {
+                log.debug("Skipping already imported activity: \"{}\" (Strava ID: {})", summary.name(), summary.id());
+            }
             return;
         }
 
