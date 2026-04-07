@@ -96,6 +96,22 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
     }
   }, [router])
 
+  const fetchStatus = useCallback(async () => {
+    const res = await fetch('/api/import/status')
+    if (res.status === 204) { handleStatusChange(null); return }
+    if (res.ok) handleStatusChange(await res.json())
+  }, [handleStatusChange])
+
+  useEffect(() => { fetchStatus() }, [fetchStatus])
+
+  useEffect(() => {
+    const active = ['PENDING', 'RUNNING', 'COMPUTING_STREETS']
+    if (!importOpen && importJob?.status && active.includes(importJob.status)) {
+      const id = setInterval(fetchStatus, 5000)
+      return () => clearInterval(id)
+    }
+  }, [importOpen, importJob?.status, fetchStatus])
+
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
