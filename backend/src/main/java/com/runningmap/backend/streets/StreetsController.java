@@ -25,7 +25,7 @@ public class StreetsController {
         UUID userId = (UUID) authentication.getPrincipal();
 
         List<StreetDto> streets = jdbcTemplate.query(
-                "SELECT s.id, s.name, ST_AsText(s.geom) as wkt, c.first_run_at, c.last_run_at " +
+                "SELECT s.id, s.zone, s.name, ST_AsText(s.geom) as wkt, c.first_run_at, c.last_run_at " +
                 "FROM osm_streets s " +
                 "JOIN covered_streets c ON s.id = c.street_id " +
                 "WHERE c.user_id = ?",
@@ -36,23 +36,34 @@ public class StreetsController {
         return ResponseEntity.ok(streets);
     }
 
-    @GetMapping("/total")
-    public ResponseEntity<Long> getTotal(Authentication authentication) {
+    @GetMapping("/zones")
+    public ResponseEntity<List<ZoneDto>> getZones(Authentication authentication) {
         UUID userId = (UUID) authentication.getPrincipal();
 
-        long total = jdbcTemplate.queryForObject(
-                "SELECT COUNT(DISTINCT s.id) " +
+        List<ZoneDto> zones = jdbcTemplate.query(
+                "SELECT s.zone, " +
+                "       COUNT(DISTINCT c.street_id) AS covered, " +
+                "       COUNT(DISTINCT s.id)        AS total " +
                 "FROM osm_streets s " +
+                "LEFT JOIN covered_streets c ON s.id = c.street_id AND c.user_id = ? " +
                 "WHERE s.zone IN (" +
                 "  SELECT DISTINCT os.zone FROM osm_streets os " +
                 "  JOIN covered_streets cs ON os.id = cs.street_id " +
                 "  WHERE cs.user_id = ?" +
-                ")",
-                Long.class,
-                userId
+                ") " +
+                "GROUP BY s.zone " +
+                "ORDER BY s.zone",
+                (rs, rowNum) -> {
+                    String zone = rs.getString("zone");
+                    long covered = rs.getLong("covered");
+                    long total = rs.getLong("total");
+                    double pct = total > 0 ? Math.round(covered * 1000.0 / total) / 10.0 : 0.0;
+                    return new ZoneDto(zone, covered, total, pct);
+                },
+                userId, userId
         );
 
-        return ResponseEntity.ok(total);
+        return ResponseEntity.ok(zones);
     }
 
     @GetMapping("/coverage")
@@ -82,11 +93,12 @@ public class StreetsController {
     private RowMapper<StreetDto> streetRowMapper() {
         return (rs, rowNum) -> {
             String id = String.valueOf(rs.getLong("id"));
+            String zone = rs.getString("zone");
             String name = rs.getString("name");
             String wkt = rs.getString("wkt");
             java.sql.Timestamp firstRunAt = rs.getTimestamp("first_run_at");
             java.sql.Timestamp lastRunAt = rs.getTimestamp("last_run_at");
-            return new StreetDto(id, name, parseWkt(wkt),
+            return new StreetDto(id, zone, name, parseWkt(wkt),
                     firstRunAt != null ? firstRunAt.toLocalDateTime() : null,
                     lastRunAt  != null ? lastRunAt.toLocalDateTime()  : null);
         };
@@ -107,7 +119,8 @@ public class StreetsController {
                 .collect(Collectors.toList());
     }
 
-    public record StreetDto(String id, String name, List<List<Double>> coordinates,
+    public record StreetDto(String id, String zone, String name, List<List<Double>> coordinates,
                             java.time.LocalDateTime firstRunAt, java.time.LocalDateTime lastRunAt) {}
+    public record ZoneDto(String name, long covered, long total, double percentage) {}
     public record CoverageDto(String zone, long covered, long total, double percentage) {}
 }

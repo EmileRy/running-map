@@ -5,14 +5,23 @@ import { MapLayout } from '@/components/MapLayout'
 
 interface Street {
   id: string
+  zone: string
   name: string | null
   coordinates: number[][]
   firstRunAt: string | null
   lastRunAt: string | null
 }
 
+interface Zone {
+  name: string
+  covered: number
+  total: number
+  percentage: number
+}
+
+const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
+
 async function fetchCoveredStreets(token: string): Promise<Street[]> {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
   const res = await fetch(`${apiUrl}/api/streets/covered`, {
     headers: { Authorization: `Bearer ${token}` },
     cache: 'no-store',
@@ -21,13 +30,12 @@ async function fetchCoveredStreets(token: string): Promise<Street[]> {
   return res.json()
 }
 
-async function fetchTotalStreets(token: string): Promise<number> {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
-  const res = await fetch(`${apiUrl}/api/streets/total`, {
+async function fetchZones(token: string): Promise<Zone[]> {
+  const res = await fetch(`${apiUrl}/api/streets/zones`, {
     headers: { Authorization: `Bearer ${token}` },
     cache: 'no-store',
   })
-  if (!res.ok) return 0
+  if (!res.ok) return []
   return res.json()
 }
 
@@ -38,11 +46,11 @@ export default async function MapPage() {
   const cookieStore = await cookies()
   const token = cookieStore.get('auth_token')?.value ?? ''
 
-  const [streets, totalStreets] = await Promise.all([
+  const [streets, zones] = await Promise.all([
     fetchCoveredStreets(token),
-    fetchTotalStreets(token),
+    fetchZones(token),
   ])
   const streetsWithCoords = streets.filter((s) => s.coordinates?.length >= 2)
 
-  return <MapLayout user={user} tracks={streetsWithCoords} totalStreets={totalStreets} />
+  return <MapLayout user={user} tracks={streetsWithCoords} zones={zones} />
 }
