@@ -274,7 +274,7 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
               Lance la synchronisation de tes activités Strava. Seules les nouvelles courses seront téléchargées.
             </p>
             <div className="flex justify-center">
-              <ImportPanel onStatusChange={handleStatusChange} onLoadingChange={setImportLoading} />
+              <ImportPanel onStatusChange={handleStatusChange} onLoadingChange={setImportLoading} tracksCount={tracks.length} zonesCount={zones.length} />
             </div>
           </div>
         </div>

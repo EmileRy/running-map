@@ -15,6 +15,8 @@ export interface ImportJob {
 interface Props {
   onStatusChange?: (job: ImportJob | null) => void
   onLoadingChange?: (loading: boolean) => void
+  tracksCount?: number
+  zonesCount?: number
 }
 
 function Spinner() {
@@ -26,7 +28,7 @@ function Spinner() {
   )
 }
 
-export function ImportPanel({ onStatusChange, onLoadingChange }: Props) {
+export function ImportPanel({ onStatusChange, onLoadingChange, tracksCount = 0, zonesCount = 0 }: Props) {
   const [job, setJob] = useState<ImportJob | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -121,23 +123,31 @@ export function ImportPanel({ onStatusChange, onLoadingChange }: Props) {
   }
 
   if (job?.status === 'DONE') {
+    const streetsLabel = tracksCount >= 1000
+      ? `${Math.round(tracksCount / 1000)}k`
+      : `${tracksCount}`
     return (
-      <div className="flex flex-col items-center gap-2 text-center">
-        <p className="text-sm font-medium text-green-400">
-          Import terminé — {job.totalActivities} course{job.totalActivities > 1 ? 's' : ''} importée{job.totalActivities > 1 ? 's' : ''}
-        </p>
+      <div className="flex flex-col items-center gap-6 text-center">
+        <div className="flex gap-8">
+          <div className="flex flex-col items-center gap-1">
+            <span className="text-3xl font-semibold text-white">{job.totalActivities}</span>
+            <span className="text-xs text-zinc-500">course{job.totalActivities > 1 ? 's' : ''}</span>
+          </div>
+          <div className="flex flex-col items-center gap-1">
+            <span className="text-3xl font-semibold text-white">{streetsLabel}</span>
+            <span className="text-xs text-zinc-500">rues couvertes</span>
+          </div>
+          <div className="flex flex-col items-center gap-1">
+            <span className="text-3xl font-semibold text-white">{zonesCount}</span>
+            <span className="text-xs text-zinc-500">zone{zonesCount > 1 ? 's' : ''}</span>
+          </div>
+        </div>
         <button
           onClick={startImport}
           disabled={loading}
-          className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 underline underline-offset-2 disabled:no-underline disabled:opacity-60"
+          className="rounded-full bg-white px-6 py-3 font-semibold text-black transition-opacity hover:opacity-80 disabled:opacity-50 w-full"
         >
-          {loading && (
-            <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-              <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-          )}
-          {loading ? 'Démarrage…' : 'Relancer'}
+          {loading ? 'Démarrage…' : 'Relancer la synchronisation'}
         </button>
       </div>
     )
