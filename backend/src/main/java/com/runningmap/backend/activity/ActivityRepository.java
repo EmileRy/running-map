@@ -12,6 +12,7 @@ import java.util.UUID;
 
 public interface ActivityRepository extends JpaRepository<Activity, UUID> {
     boolean existsByUserIdAndStravaActivityId(UUID userId, Long stravaActivityId);
+    Optional<Activity> findByUserIdAndStravaActivityId(UUID userId, Long stravaActivityId);
     Page<Activity> findByUserId(UUID userId, Pageable pageable);
 
     @Query("SELECT MAX(a.startDate) FROM Activity a WHERE a.userId = :userId")

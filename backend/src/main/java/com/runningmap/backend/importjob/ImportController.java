@@ -30,6 +30,9 @@ public class ImportController {
     }
 
     private ImportJobResponse toResponse(ImportJob job) {
+        Integer queuePosition = job.getStatus() == ImportStatus.PENDING
+                ? (int) importService.getQueuePosition(job)
+                : null;
         return new ImportJobResponse(
                 job.getId(),
                 job.getStatus(),
@@ -37,7 +40,8 @@ public class ImportController {
                 job.getProcessedActivities(),
                 job.getErrorMessage(),
                 job.getStartedAt(),
-                job.getCompletedAt()
+                job.getCompletedAt(),
+                queuePosition
         );
     }
 
@@ -48,6 +52,7 @@ public class ImportController {
             int processedActivities,
             String errorMessage,
             java.time.LocalDateTime startedAt,
-            java.time.LocalDateTime completedAt
+            java.time.LocalDateTime completedAt,
+            Integer queuePosition
     ) {}
 }

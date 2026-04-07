@@ -4,8 +4,10 @@ import dynamic from 'next/dynamic'
 
 interface Track {
   id: string
-  name: string
+  name: string | null
   coordinates: number[][]
+  firstRunAt: string | null
+  lastRunAt: string | null
 }
 
 const LeafletMap = dynamic(() => import('./LeafletMap'), {
@@ -17,13 +19,13 @@ const LeafletMap = dynamic(() => import('./LeafletMap'), {
   ),
 })
 
-export function MapView({ tracks, runCount }: { tracks: Track[]; runCount: number }) {
+export function MapView({ tracks, selectedDate }: {
+  tracks: Track[]
+  selectedDate: number
+}) {
   return (
     <div className="relative h-full w-full">
-      <LeafletMap tracks={tracks} />
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[1000] rounded-full bg-black/60 px-4 py-2 text-sm text-white backdrop-blur-sm pointer-events-none">
-        {runCount} course{runCount > 1 ? 's' : ''}
-      </div>
+      <LeafletMap tracks={tracks} selectedDate={selectedDate} />
     </div>
   )
 }

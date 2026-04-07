@@ -6,14 +6,27 @@ import 'leaflet/dist/leaflet.css'
 
 interface Track {
   id: string
-  name: string
+  zone: string
+  name: string | null
   coordinates: number[][]
+  firstRunAt: string | null
+  lastRunAt: string | null
 }
 
-export default function LeafletMap({ tracks }: { tracks: Track[] }) {
+interface PolylineEntry {
+  polyline: L.Polyline
+  firstRunAt: number | null // epoch ms, null = toujours visible
+}
+
+export default function LeafletMap({ tracks, selectedDate }: {
+  tracks: Track[]
+  selectedDate: number
+}) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<L.Map | null>(null)
+  const polylinesRef = useRef<PolylineEntry[]>([])
 
+  // Initialisation de la carte — une seule fois
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
 
@@ -28,6 +41,26 @@ export default function LeafletMap({ tracks }: { tracks: Track[] }) {
       maxZoom: 19,
     }).addTo(map)
 
+    mapRef.current = map
+
+    return () => {
+      map.remove()
+      mapRef.current = null
+      polylinesRef.current = []
+    }
+  }, [])
+
+  // Mise à jour des polylines quand les tracks changent
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+
+    // Supprimer les anciennes polylines
+    for (const { polyline } of polylinesRef.current) {
+      polyline.remove()
+    }
+    polylinesRef.current = []
+
     const allBounds: L.LatLngBounds[] = []
 
     for (const track of tracks) {
@@ -40,20 +73,30 @@ export default function LeafletMap({ tracks }: { tracks: Track[] }) {
         smoothFactor: 1,
       }).addTo(map)
       allBounds.push(polyline.getBounds())
+      polylinesRef.current.push({
+        polyline,
+        firstRunAt: track.firstRunAt ? new Date(track.firstRunAt).getTime() : null,
+      })
     }
 
     if (allBounds.length > 0) {
       const combined = allBounds.reduce((acc, b) => acc.extend(b), allBounds[0])
       map.fitBounds(combined, { padding: [32, 32] })
     }
+  }, [tracks])
 
-    mapRef.current = map
-
-    return () => {
-      map.remove()
-      mapRef.current = null
+  // Affichage/masquage des polylines selon la date sélectionnée
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    for (const { polyline, firstRunAt } of polylinesRef.current) {
+      if (firstRunAt == null || firstRunAt <= selectedDate) {
+        if (!map.hasLayer(polyline)) polyline.addTo(map)
+      } else {
+        if (map.hasLayer(polyline)) polyline.remove()
+      }
     }
-  }, []) // tracks are stable — passed once from server
+  }, [selectedDate])
 
   return <div ref={containerRef} className="h-full w-full" />
 }

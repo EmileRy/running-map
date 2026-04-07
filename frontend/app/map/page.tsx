@@ -3,36 +3,40 @@ import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/auth'
 import { MapLayout } from '@/components/MapLayout'
 
-interface Track {
+interface Street {
   id: string
-  name: string
+  zone: string
+  name: string | null
   coordinates: number[][]
+  firstRunAt: string | null
+  lastRunAt: string | null
 }
 
-interface TracksPage {
-  content: Track[]
-  last: boolean
+interface Zone {
+  name: string
+  covered: number
+  total: number
+  percentage: number
 }
 
-async function fetchAllTracks(token: string): Promise<Track[]> {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
-  const all: Track[] = []
-  let page = 0
+const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
 
-  while (true) {
-    const res = await fetch(`${apiUrl}/api/tracks?page=${page}&size=100`, {
-      headers: { Authorization: `Bearer ${token}` },
-      cache: 'no-store',
-    })
-    if (!res.ok) break
+async function fetchCoveredStreets(token: string): Promise<Street[]> {
+  const res = await fetch(`${apiUrl}/api/streets/covered`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  })
+  if (!res.ok) return []
+  return res.json()
+}
 
-    const data: TracksPage = await res.json()
-    all.push(...data.content)
-    if (data.last) break
-    page++
-  }
-
-  return all
+async function fetchZones(token: string): Promise<Zone[]> {
+  const res = await fetch(`${apiUrl}/api/streets/zones`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  })
+  if (!res.ok) return []
+  return res.json()
 }
 
 export default async function MapPage() {
@@ -42,8 +46,11 @@ export default async function MapPage() {
   const cookieStore = await cookies()
   const token = cookieStore.get('auth_token')?.value ?? ''
 
-  const tracks = await fetchAllTracks(token)
-  const tracksWithCoords = tracks.filter((t) => t.coordinates?.length >= 2)
+  const [streets, zones] = await Promise.all([
+    fetchCoveredStreets(token),
+    fetchZones(token),
+  ])
+  const streetsWithCoords = streets.filter((s) => s.coordinates?.length >= 2)
 
-  return <MapLayout user={user} tracks={tracksWithCoords} />
+  return <MapLayout user={user} tracks={streetsWithCoords} zones={zones} />
 }
