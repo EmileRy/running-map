@@ -36,6 +36,25 @@ public class StreetsController {
         return ResponseEntity.ok(streets);
     }
 
+    @GetMapping("/total")
+    public ResponseEntity<Long> getTotal(Authentication authentication) {
+        UUID userId = (UUID) authentication.getPrincipal();
+
+        long total = jdbcTemplate.queryForObject(
+                "SELECT COUNT(DISTINCT s.id) " +
+                "FROM osm_streets s " +
+                "WHERE s.zone IN (" +
+                "  SELECT DISTINCT os.zone FROM osm_streets os " +
+                "  JOIN covered_streets cs ON os.id = cs.street_id " +
+                "  WHERE cs.user_id = ?" +
+                ")",
+                Long.class,
+                userId
+        );
+
+        return ResponseEntity.ok(total);
+    }
+
     @GetMapping("/coverage")
     public ResponseEntity<CoverageDto> getCoverage(
             Authentication authentication,

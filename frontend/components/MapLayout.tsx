@@ -21,7 +21,7 @@ interface Track {
 
 const fmt = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
 
-export function MapLayout({ user, tracks }: { user: User; tracks: Track[] }) {
+export function MapLayout({ user, tracks, totalStreets }: { user: User; tracks: Track[]; totalStreets: number }) {
   const router = useRouter()
   const [menuOpen, setMenuOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
@@ -167,7 +167,9 @@ export function MapLayout({ user, tracks }: { user: User; tracks: Track[] }) {
               {/* Badge compteur + date courante */}
               <div className="flex items-center justify-between">
                 <span className="rounded-full bg-black/60 px-3 py-1 text-xs text-white backdrop-blur-sm">
-                  {runCount} rue{runCount > 1 ? 's' : ''} couvertes
+                  {totalStreets > 0
+                    ? `${Math.round(runCount / totalStreets * 100)}% exploré${runCount > 1 ? 's' : ''} (${runCount} rue${runCount > 1 ? 's' : ''} couvertes)`
+                    : `${runCount} rue${runCount > 1 ? 's' : ''} couvertes`}
                 </span>
                 {showSlider && (
                   <span className="text-sm font-medium text-white">

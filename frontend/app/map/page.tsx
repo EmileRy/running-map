@@ -21,6 +21,16 @@ async function fetchCoveredStreets(token: string): Promise<Street[]> {
   return res.json()
 }
 
+async function fetchTotalStreets(token: string): Promise<number> {
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
+  const res = await fetch(`${apiUrl}/api/streets/total`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  })
+  if (!res.ok) return 0
+  return res.json()
+}
+
 export default async function MapPage() {
   const user = await getCurrentUser()
   if (!user) redirect('/')
@@ -28,8 +38,11 @@ export default async function MapPage() {
   const cookieStore = await cookies()
   const token = cookieStore.get('auth_token')?.value ?? ''
 
-  const streets = await fetchCoveredStreets(token)
+  const [streets, totalStreets] = await Promise.all([
+    fetchCoveredStreets(token),
+    fetchTotalStreets(token),
+  ])
   const streetsWithCoords = streets.filter((s) => s.coordinates?.length >= 2)
 
-  return <MapLayout user={user} tracks={streetsWithCoords} />
+  return <MapLayout user={user} tracks={streetsWithCoords} totalStreets={totalStreets} />
 }
