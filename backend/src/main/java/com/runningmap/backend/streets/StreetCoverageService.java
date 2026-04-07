@@ -21,13 +21,15 @@ public class StreetCoverageService {
 
     public void computeCoverageForActivity(UUID activityId, UUID userId) {
         int inserted = jdbcTemplate.update(
-            "INSERT INTO covered_streets (user_id, street_id) " +
-            "SELECT DISTINCT ?, s.id " +
-            "FROM (SELECT id, track_geom, ST_Buffer(track_geom_simplified, ?) AS track_buffer" +
+            "INSERT INTO covered_streets (user_id, street_id, first_run_at, last_run_at) " +
+            "SELECT DISTINCT ?, s.id, a.start_date, a.start_date " +
+            "FROM (SELECT id, track_geom, start_date, ST_Buffer(track_geom_simplified, ?) AS track_buffer" +
             "      FROM activities WHERE id = ? AND track_geom IS NOT NULL) a " +
             "JOIN osm_streets s ON ST_DWithin(s.geom, a.track_geom, ?) " +
             "WHERE ST_Length(ST_Intersection(a.track_buffer, s.geom)) * 111320 >= ? " +
-            "ON CONFLICT DO NOTHING",
+            "ON CONFLICT (user_id, street_id) DO UPDATE " +
+            "  SET first_run_at = LEAST(covered_streets.first_run_at, EXCLUDED.first_run_at)," +
+            "      last_run_at  = GREATEST(covered_streets.last_run_at, EXCLUDED.last_run_at)",
             userId, BUFFER_DEGREES, activityId, BUFFER_DEGREES, MIN_COVERED_METERS
         );
         jdbcTemplate.update(
@@ -100,17 +102,19 @@ public class StreetCoverageService {
         // - ST_Buffer + ST_Intersection sur track_geom_simplified (100-300 pts vs 3000-6000)
         // - ST_Length en géométrie plane (* 111320) évite le cast ::geography coûteux
         int inserted = jdbcTemplate.update(
-            "INSERT INTO covered_streets (user_id, street_id) " +
-            "SELECT DISTINCT ?, s.id " +
+            "INSERT INTO covered_streets (user_id, street_id, first_run_at, last_run_at) " +
+            "SELECT DISTINCT ?, s.id, a.start_date, a.start_date " +
             "FROM (" +
-            "  SELECT id, track_geom, track_geom_simplified, streets_computed_at," +
+            "  SELECT id, track_geom, track_geom_simplified, streets_computed_at, start_date," +
             "         ST_Buffer(track_geom_simplified, ?) AS track_buffer" +
             "  FROM activities" +
             "  WHERE user_id = ? AND track_geom IS NOT NULL AND streets_computed_at IS NULL" +
             ") a " +
             "JOIN osm_streets s ON ST_DWithin(s.geom, a.track_geom, ?) " +
             "WHERE ST_Length(ST_Intersection(a.track_buffer, s.geom)) * 111320 >= ? " +
-            "ON CONFLICT DO NOTHING",
+            "ON CONFLICT (user_id, street_id) DO UPDATE " +
+            "  SET first_run_at = LEAST(covered_streets.first_run_at, EXCLUDED.first_run_at)," +
+            "      last_run_at  = GREATEST(covered_streets.last_run_at, EXCLUDED.last_run_at)",
             userId, BUFFER_DEGREES, userId, BUFFER_DEGREES, MIN_COVERED_METERS
         );
 

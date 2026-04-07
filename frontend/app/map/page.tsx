@@ -7,6 +7,8 @@ interface Street {
   id: string
   name: string | null
   coordinates: number[][]
+  firstRunAt: string | null
+  lastRunAt: string | null
 }
 
 async function fetchCoveredStreets(token: string): Promise<Street[]> {

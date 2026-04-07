@@ -25,7 +25,7 @@ public class StreetsController {
         UUID userId = (UUID) authentication.getPrincipal();
 
         List<StreetDto> streets = jdbcTemplate.query(
-                "SELECT s.id, s.name, ST_AsText(s.geom) as wkt " +
+                "SELECT s.id, s.name, ST_AsText(s.geom) as wkt, c.first_run_at, c.last_run_at " +
                 "FROM osm_streets s " +
                 "JOIN covered_streets c ON s.id = c.street_id " +
                 "WHERE c.user_id = ?",
@@ -65,7 +65,11 @@ public class StreetsController {
             String id = String.valueOf(rs.getLong("id"));
             String name = rs.getString("name");
             String wkt = rs.getString("wkt");
-            return new StreetDto(id, name, parseWkt(wkt));
+            java.sql.Timestamp firstRunAt = rs.getTimestamp("first_run_at");
+            java.sql.Timestamp lastRunAt = rs.getTimestamp("last_run_at");
+            return new StreetDto(id, name, parseWkt(wkt),
+                    firstRunAt != null ? firstRunAt.toLocalDateTime() : null,
+                    lastRunAt  != null ? lastRunAt.toLocalDateTime()  : null);
         };
     }
 
@@ -84,6 +88,7 @@ public class StreetsController {
                 .collect(Collectors.toList());
     }
 
-    public record StreetDto(String id, String name, List<List<Double>> coordinates) {}
+    public record StreetDto(String id, String name, List<List<Double>> coordinates,
+                            java.time.LocalDateTime firstRunAt, java.time.LocalDateTime lastRunAt) {}
     public record CoverageDto(String zone, long covered, long total, double percentage) {}
 }

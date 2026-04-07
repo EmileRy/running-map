@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { MapView } from './MapView'
 import { ImportPanel, type ImportJob } from './ImportPanel'
@@ -15,7 +15,11 @@ interface Track {
   id: string
   name: string | null
   coordinates: number[][]
+  firstRunAt: string | null
+  lastRunAt: string | null
 }
+
+const fmt = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
 
 export function MapLayout({ user, tracks }: { user: User; tracks: Track[] }) {
   const router = useRouter()
@@ -26,6 +30,44 @@ export function MapLayout({ user, tracks }: { user: User; tracks: Track[] }) {
   const prevStatusRef = useRef<string | null | undefined>(undefined)
   const menuRef = useRef<HTMLDivElement>(null)
 
+  // Dates min/max calculées uniquement depuis les données (pas de Date.now() ici — hydration mismatch)
+  const { minDate, maxDate } = useMemo(() => {
+    let min = Infinity
+    let max = -Infinity
+    for (const t of tracks) {
+      if (!t.firstRunAt) continue
+      const ms = new Date(t.firstRunAt).getTime()
+      if (ms < min) min = ms
+      if (ms > max) max = ms
+    }
+    return {
+      minDate: isFinite(min) ? min : null,
+      maxDate: isFinite(max) ? max : null,
+    }
+  }, [tracks])
+
+  // Infinity = tout afficher (valeur stable côté SSR, jamais rendue dans le DOM)
+  const [selectedDate, setSelectedDate] = useState<number>(Infinity)
+  // Rendu du slider uniquement côté client pour pouvoir utiliser Date.now() librement
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => { setMounted(true) }, [])
+
+  useEffect(() => {
+    setSelectedDate(maxDate ?? Date.now())
+  }, [maxDate])
+
+  // Fallbacks client-only (safe car utilisés seulement après montage)
+  const sliderMin = minDate ?? (Date.now() - 5 * 365 * 24 * 60 * 60 * 1000)
+  const sliderMax = maxDate ?? Date.now()
+
+  const runCount = useMemo(
+    () => tracks.filter(t => !t.firstRunAt || new Date(t.firstRunAt).getTime() <= selectedDate).length,
+    [tracks, selectedDate]
+  )
+
+  const showSlider = mounted && tracks.length > 0
+
   const isImporting = importLoading || importJob?.status === 'RUNNING' || importJob?.status === 'PENDING'
 
   const handleStatusChange = useCallback((job: ImportJob | null) => {
@@ -33,7 +75,7 @@ export function MapLayout({ user, tracks }: { user: User; tracks: Track[] }) {
     prevStatusRef.current = job?.status ?? null
     setImportJob(job)
 
-    if (prevStatus === 'RUNNING' && job?.status === 'DONE') {
+    if (job?.status === 'DONE' && prevStatus != null && prevStatus !== 'DONE') {
       router.refresh()
     }
   }, [router])
@@ -114,9 +156,56 @@ export function MapLayout({ user, tracks }: { user: User; tracks: Track[] }) {
         </div>
       </header>
 
-      {/* Map */}
-      <div className="flex-1 min-h-0 isolate">
-        <MapView tracks={tracks} runCount={tracks.length} />
+      {/* Map + overlay */}
+      <div className="flex-1 min-h-0 isolate relative">
+        <MapView tracks={tracks} selectedDate={selectedDate} />
+
+        {mounted && (
+          <div className="absolute bottom-0 left-0 right-0 z-[1000] px-6 pb-5 pt-10 bg-gradient-to-t from-black/70 to-transparent pointer-events-none">
+            <div className="max-w-3xl mx-auto flex flex-col gap-3">
+
+              {/* Badge compteur + date courante */}
+              <div className="flex items-center justify-between">
+                <span className="rounded-full bg-black/60 px-3 py-1 text-xs text-white backdrop-blur-sm">
+                  {runCount} rue{runCount > 1 ? 's' : ''} couvertes
+                </span>
+                {showSlider && (
+                  <span className="text-sm font-medium text-white">
+                    {fmt.format(new Date(Math.min(selectedDate, sliderMax)))}
+                  </span>
+                )}
+              </div>
+
+              {/* Curseur temporel */}
+              {showSlider && (
+                <div className="pointer-events-auto flex flex-col gap-1">
+                  <input
+                    type="range"
+                    min={sliderMin}
+                    max={sliderMax}
+                    value={Math.min(selectedDate, sliderMax)}
+                    onChange={e => setSelectedDate(Number(e.target.value))}
+                    className="w-full h-1.5 appearance-none rounded-full cursor-pointer
+                      [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4
+                      [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full
+                      [&::-webkit-slider-thumb]:bg-[#FC4C02] [&::-webkit-slider-thumb]:cursor-pointer
+                      [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4
+                      [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-[#FC4C02]
+                      [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer"
+                    style={{
+                      background: `linear-gradient(to right, #FC4C02 0%, #FC4C02 ${((Math.min(selectedDate, sliderMax) - sliderMin) / (sliderMax - sliderMin)) * 100}%, #52525b ${((Math.min(selectedDate, sliderMax) - sliderMin) / (sliderMax - sliderMin)) * 100}%, #52525b 100%)`
+                    }}
+                  />
+                  <div className="flex justify-between text-xs text-zinc-400">
+                    <span>{fmt.format(new Date(sliderMin))}</span>
+                    <span>{fmt.format(new Date(sliderMax))}</span>
+                  </div>
+                </div>
+              )}
+
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Import modal */}

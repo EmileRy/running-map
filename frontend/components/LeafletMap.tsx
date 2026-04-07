@@ -8,12 +8,24 @@ interface Track {
   id: string
   name: string | null
   coordinates: number[][]
+  firstRunAt: string | null
+  lastRunAt: string | null
 }
 
-export default function LeafletMap({ tracks }: { tracks: Track[] }) {
+interface PolylineEntry {
+  polyline: L.Polyline
+  firstRunAt: number | null // epoch ms, null = toujours visible
+}
+
+export default function LeafletMap({ tracks, selectedDate }: {
+  tracks: Track[]
+  selectedDate: number
+}) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<L.Map | null>(null)
+  const polylinesRef = useRef<PolylineEntry[]>([])
 
+  // Initialisation de la carte — une seule fois
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
 
@@ -40,6 +52,10 @@ export default function LeafletMap({ tracks }: { tracks: Track[] }) {
         smoothFactor: 1,
       }).addTo(map)
       allBounds.push(polyline.getBounds())
+      polylinesRef.current.push({
+        polyline,
+        firstRunAt: track.firstRunAt ? new Date(track.firstRunAt).getTime() : null,
+      })
     }
 
     if (allBounds.length > 0) {
@@ -52,8 +68,22 @@ export default function LeafletMap({ tracks }: { tracks: Track[] }) {
     return () => {
       map.remove()
       mapRef.current = null
+      polylinesRef.current = []
     }
-  }, []) // tracks are stable — passed once from server
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Affichage/masquage des polylines selon la date sélectionnée
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    for (const { polyline, firstRunAt } of polylinesRef.current) {
+      if (firstRunAt == null || firstRunAt <= selectedDate) {
+        if (!map.hasLayer(polyline)) polyline.addTo(map)
+      } else {
+        if (map.hasLayer(polyline)) polyline.remove()
+      }
+    }
+  }, [selectedDate])
 
   return <div ref={containerRef} className="h-full w-full" />
 }
