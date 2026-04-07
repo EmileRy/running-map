@@ -6,6 +6,7 @@ import 'leaflet/dist/leaflet.css'
 
 interface Track {
   id: string
+  zone: string
   name: string | null
   coordinates: number[][]
   firstRunAt: string | null
@@ -40,6 +41,26 @@ export default function LeafletMap({ tracks, selectedDate }: {
       maxZoom: 19,
     }).addTo(map)
 
+    mapRef.current = map
+
+    return () => {
+      map.remove()
+      mapRef.current = null
+      polylinesRef.current = []
+    }
+  }, [])
+
+  // Mise à jour des polylines quand les tracks changent
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+
+    // Supprimer les anciennes polylines
+    for (const { polyline } of polylinesRef.current) {
+      polyline.remove()
+    }
+    polylinesRef.current = []
+
     const allBounds: L.LatLngBounds[] = []
 
     for (const track of tracks) {
@@ -62,15 +83,7 @@ export default function LeafletMap({ tracks, selectedDate }: {
       const combined = allBounds.reduce((acc, b) => acc.extend(b), allBounds[0])
       map.fitBounds(combined, { padding: [32, 32] })
     }
-
-    mapRef.current = map
-
-    return () => {
-      map.remove()
-      mapRef.current = null
-      polylinesRef.current = []
-    }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [tracks])
 
   // Affichage/masquage des polylines selon la date sélectionnée
   useEffect(() => {
