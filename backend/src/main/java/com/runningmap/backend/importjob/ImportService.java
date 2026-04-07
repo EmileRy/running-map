@@ -10,6 +10,7 @@ import com.runningmap.backend.config.StravaProperties;
 import com.runningmap.backend.strava.StravaActivitySummary;
 import com.runningmap.backend.strava.StravaApiClient;
 import com.runningmap.backend.streets.StreetCoverageService;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -37,6 +38,21 @@ public class ImportService {
     private final StravaProperties stravaProperties;
     private final StreetCoverageService streetCoverageService;
     private final JdbcTemplate jdbcTemplate;
+
+    @PostConstruct
+    public void resetStuckJobs() {
+        List<ImportJob> stuck = importJobRepository.findAllByStatusIn(
+                List.of(ImportStatus.RUNNING, ImportStatus.COMPUTING_STREETS));
+        if (stuck.isEmpty()) return;
+        log.warn("Resetting {} stuck job(s) to PENDING after restart", stuck.size());
+        stuck.forEach(job -> {
+            job.setStatus(ImportStatus.PENDING);
+            job.setProcessedActivities(0);
+            job.setTotalActivities(0);
+            job.setStartedAt(null);
+        });
+        importJobRepository.saveAll(stuck);
+    }
 
     public ImportJob startImport(UUID userId) {
         if (importJobRepository.existsByUserIdAndStatusIn(userId,
