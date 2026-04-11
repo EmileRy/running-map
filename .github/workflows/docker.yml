@@ -59,9 +59,6 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Écrire le .npmrc
-        run: echo "${{ secrets.NPMRC_CONTENT }}" > /tmp/.npmrc
-
       - name: Build & push
         uses: docker/build-push-action@v6
         with:
@@ -70,5 +67,3 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           build-args: |
             NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}
-          secrets: |
-            npmrc=/tmp/.npmrc
