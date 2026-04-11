@@ -4,10 +4,12 @@ import dynamic from 'next/dynamic'
 
 interface Track {
   id: string
+  zone: string
   name: string | null
   coordinates: number[][]
   firstRunAt: string | null
   lastRunAt: string | null
+  lengthM: number
 }
 
 const LeafletMap = dynamic(() => import('./LeafletMap'), {

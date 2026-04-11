@@ -37,7 +37,7 @@ public class OverpassService {
         String query = """
                 [out:json][timeout:120];
                 area["name"="%s"]["boundary"="administrative"]["admin_level"="8"]->.a;
-                way["highway"~"^(residential|living_street|pedestrian|footway|path|cycleway|service|unclassified|tertiary|secondary|primary)$"]["area"!="yes"](area.a);
+                way["highway"~"^(residential|living_street|pedestrian|path|unclassified|tertiary|secondary|primary)$"]["area"!="yes"](area.a);
                 out geom;
                 """.formatted(zone);
 

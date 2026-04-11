@@ -1,0 +1,1 @@
+docker build --secret id=npmrc,src=$HOME/.npmrc --build-arg NEXT_PUBLIC_API_URL=https://pacemaster.app:8080 -t emilerey/running-map-frontend:latest ./frontend
