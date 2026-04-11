@@ -153,6 +153,16 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Powered by Strava */}
+          <a
+            href="https://www.strava.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-zinc-500 hover:text-[#FC5200] transition-colors"
+          >
+            Powered by Strava
+          </a>
+
           {/* Zone selector */}
           {zones.length > 0 && (
             <div className="relative">
