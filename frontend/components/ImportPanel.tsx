@@ -174,7 +174,7 @@ export function ImportPanel({ onStatusChange, onLoadingChange, tracksCount = 0, 
       disabled={loading}
       className="rounded-full bg-white px-6 py-3 font-semibold text-black transition-opacity hover:opacity-80 disabled:opacity-50"
     >
-      {loading ? 'Démarrage…' : 'Importer mes activités Strava'}
+      {loading ? 'Démarrage…' : 'Importer mes activités'}
     </button>
   )
 }
