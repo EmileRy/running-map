@@ -15,10 +15,10 @@ import java.util.UUID;
 @Slf4j
 public class StreetCoverageService {
 
-    // ~15m en degrés à 45°N — plus rapide que le cast ::geography
-    private static final double BUFFER_DEGREES = 0.000135;
-    // Longueur minimale (en mètres) de la rue devant tomber dans le buffer pour être comptabilisée
-    private static final double MIN_COVERED_METERS = 30;
+    // ~22m en degrés à 45°N — plus rapide que le cast ::geography
+    private static final double BUFFER_DEGREES = 0.000200;
+    // Fraction minimale de la longueur du segment devant tomber dans le buffer pour être comptabilisée
+    private static final double MIN_COVERED_RATIO = 0.25;
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -29,11 +29,11 @@ public class StreetCoverageService {
             "FROM (SELECT id, track_geom, start_date, ST_Buffer(track_geom_simplified, ?) AS track_buffer" +
             "      FROM activities WHERE id = ? AND track_geom IS NOT NULL) a " +
             "JOIN osm_streets s ON ST_DWithin(s.geom, a.track_geom, ?) " +
-            "WHERE ST_Length(ST_Intersection(a.track_buffer, s.geom)) * 111320 >= ? " +
+            "WHERE ST_Length(ST_Intersection(a.track_buffer, s.geom)) / NULLIF(ST_Length(s.geom), 0) >= ? " +
             "ON CONFLICT (user_id, street_id) DO UPDATE " +
             "  SET first_run_at = LEAST(covered_streets.first_run_at, EXCLUDED.first_run_at)," +
             "      last_run_at  = GREATEST(covered_streets.last_run_at, EXCLUDED.last_run_at)",
-            userId, BUFFER_DEGREES, activityId, BUFFER_DEGREES, MIN_COVERED_METERS
+            userId, BUFFER_DEGREES, activityId, BUFFER_DEGREES, MIN_COVERED_RATIO
         );
         jdbcTemplate.update(
             "UPDATE activities SET streets_computed_at = NOW(), " +
@@ -60,12 +60,12 @@ public class StreetCoverageService {
             "      ST_Buffer(track_geom_simplified, ?) AS track_buffer, computed_zones" +
             "      FROM activities WHERE id = ? AND track_geom IS NOT NULL) a " +
             "JOIN osm_streets s ON ST_DWithin(s.geom, a.track_geom, ?) " +
-            "WHERE ST_Length(ST_Intersection(a.track_buffer, s.geom)) * 111320 >= ? " +
+            "WHERE ST_Length(ST_Intersection(a.track_buffer, s.geom)) / NULLIF(ST_Length(s.geom), 0) >= ? " +
             "AND s.zone != ALL(a.computed_zones) " +
             "ON CONFLICT (user_id, street_id) DO UPDATE " +
             "  SET first_run_at = LEAST(covered_streets.first_run_at, EXCLUDED.first_run_at)," +
             "      last_run_at  = GREATEST(covered_streets.last_run_at, EXCLUDED.last_run_at)",
-            BUFFER_DEGREES, activityId, BUFFER_DEGREES, MIN_COVERED_METERS
+            BUFFER_DEGREES, activityId, BUFFER_DEGREES, MIN_COVERED_RATIO
         );
         jdbcTemplate.update(
             "UPDATE activities SET computed_zones = ARRAY(SELECT DISTINCT zone FROM osm_streets) WHERE id = ?",
@@ -135,7 +135,7 @@ public class StreetCoverageService {
             // - ST_Length en géométrie plane (* 111320) évite le cast ::geography coûteux
             int inserted = jdbcTemplate.update(
                 "INSERT INTO covered_streets (user_id, street_id, first_run_at, last_run_at) " +
-                "SELECT DISTINCT ?, s.id, a.start_date, a.start_date " +
+                "SELECT ?, s.id, MIN(a.start_date), MAX(a.start_date) " +
                 "FROM (" +
                 "  SELECT id, track_geom, track_geom_simplified, start_date," +
                 "         ST_Buffer(track_geom_simplified, ?) AS track_buffer" +
@@ -143,11 +143,12 @@ public class StreetCoverageService {
                 "  WHERE user_id = ? AND track_geom IS NOT NULL AND streets_computed_at IS NULL" +
                 ") a " +
                 "JOIN osm_streets s ON ST_DWithin(s.geom, a.track_geom, ?) " +
-                "WHERE ST_Length(ST_Intersection(a.track_buffer, s.geom)) * 111320 >= ? " +
+                "WHERE ST_Length(ST_Intersection(a.track_buffer, s.geom)) / NULLIF(ST_Length(s.geom), 0) >= ? " +
+                "GROUP BY s.id " +
                 "ON CONFLICT (user_id, street_id) DO UPDATE " +
                 "  SET first_run_at = LEAST(covered_streets.first_run_at, EXCLUDED.first_run_at)," +
                 "      last_run_at  = GREATEST(covered_streets.last_run_at, EXCLUDED.last_run_at)",
-                userId, BUFFER_DEGREES, userId, BUFFER_DEGREES, MIN_COVERED_METERS
+                userId, BUFFER_DEGREES, userId, BUFFER_DEGREES, MIN_COVERED_RATIO
             );
 
             jdbcTemplate.update(
