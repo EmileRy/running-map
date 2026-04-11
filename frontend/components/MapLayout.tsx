@@ -18,12 +18,14 @@ interface Track {
   coordinates: number[][]
   firstRunAt: string | null
   lastRunAt: string | null
+  lengthM: number
 }
 
 interface Zone {
   name: string
   covered: number
   total: number
+  totalLengthM: number
   percentage: number
 }
 
@@ -75,10 +77,17 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
   const sliderMin = minDate ?? (Date.now() - 5 * 365 * 24 * 60 * 60 * 1000)
   const sliderMax = maxDate ?? Date.now()
 
-  const runCount = useMemo(
-    () => visibleTracks.filter(t => !t.firstRunAt || new Date(t.firstRunAt).getTime() <= selectedDate).length,
-    [visibleTracks, selectedDate]
-  )
+  const { runCount, coveredLengthM } = useMemo(() => {
+    let count = 0
+    let length = 0
+    for (const t of visibleTracks) {
+      if (!t.firstRunAt || new Date(t.firstRunAt).getTime() <= selectedDate) {
+        count++
+        length += t.lengthM
+      }
+    }
+    return { runCount: count, coveredLengthM: length }
+  }, [visibleTracks, selectedDate])
 
   const zoneStats = selectedZone ? zones.find(z => z.name === selectedZone) ?? null : null
 
@@ -221,7 +230,7 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
               <div className="flex items-center justify-between">
                 <span className="rounded-full bg-black/60 px-3 py-1 text-xs text-white backdrop-blur-sm">
                   {zoneStats
-                    ? `${Math.round(runCount / zoneStats.total * 100)}% explorés (${runCount} rue${runCount > 1 ? 's' : ''} couvertes)`
+                    ? `${Math.round(coveredLengthM / zoneStats.totalLengthM * 1000) / 10}% explorés (${runCount} rue${runCount > 1 ? 's' : ''} couvertes)`
                     : `${runCount} rue${runCount > 1 ? 's' : ''} couvertes`}
                 </span>
                 {showSlider && (

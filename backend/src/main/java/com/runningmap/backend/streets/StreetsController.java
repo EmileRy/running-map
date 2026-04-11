@@ -25,7 +25,8 @@ public class StreetsController {
         UUID userId = (UUID) authentication.getPrincipal();
 
         List<StreetDto> streets = jdbcTemplate.query(
-                "SELECT s.id, s.zone, s.name, ST_AsText(s.geom) as wkt, c.first_run_at, c.last_run_at " +
+                "SELECT s.id, s.zone, s.name, ST_AsText(s.geom) as wkt, c.first_run_at, c.last_run_at, " +
+                "       ST_Length(s.geom::geography) AS length_m " +
                 "FROM osm_streets s " +
                 "JOIN covered_streets c ON s.id = c.street_id " +
                 "WHERE c.user_id = ?",
@@ -43,7 +44,9 @@ public class StreetsController {
         List<ZoneDto> zones = jdbcTemplate.query(
                 "SELECT s.zone, " +
                 "       COUNT(DISTINCT c.street_id) AS covered, " +
-                "       COUNT(DISTINCT s.id)        AS total " +
+                "       COUNT(DISTINCT s.id)        AS total, " +
+                "       COALESCE(SUM(CASE WHEN c.street_id IS NOT NULL THEN ST_Length(s.geom::geography) END), 0) AS covered_length, " +
+                "       SUM(ST_Length(s.geom::geography)) AS total_length " +
                 "FROM osm_streets s " +
                 "LEFT JOIN covered_streets c ON s.id = c.street_id AND c.user_id = ? " +
                 "WHERE s.zone IN (" +
@@ -57,8 +60,10 @@ public class StreetsController {
                     String zone = rs.getString("zone");
                     long covered = rs.getLong("covered");
                     long total = rs.getLong("total");
-                    double pct = total > 0 ? Math.round(covered * 1000.0 / total) / 10.0 : 0.0;
-                    return new ZoneDto(zone, covered, total, pct);
+                    double coveredLength = rs.getDouble("covered_length");
+                    double totalLength = rs.getDouble("total_length");
+                    double pct = totalLength > 0 ? Math.round(coveredLength * 1000.0 / totalLength) / 10.0 : 0.0;
+                    return new ZoneDto(zone, covered, total, totalLength, pct);
                 },
                 userId, userId
         );
@@ -76,7 +81,9 @@ public class StreetsController {
         Map<String, Object> result = jdbcTemplate.queryForMap(
                 "SELECT " +
                 "  COUNT(DISTINCT c.street_id) as covered, " +
-                "  COUNT(DISTINCT s.id) as total " +
+                "  COUNT(DISTINCT s.id) as total, " +
+                "  COALESCE(SUM(CASE WHEN c.street_id IS NOT NULL THEN ST_Length(s.geom::geography) END), 0) AS covered_length, " +
+                "  SUM(ST_Length(s.geom::geography)) AS total_length " +
                 "FROM osm_streets s " +
                 "LEFT JOIN covered_streets c ON s.id = c.street_id AND c.user_id = ? " +
                 "WHERE s.zone = ?",
@@ -85,9 +92,11 @@ public class StreetsController {
 
         long covered = ((Number) result.get("covered")).longValue();
         long total = ((Number) result.get("total")).longValue();
-        double pct = total > 0 ? Math.round(covered * 1000.0 / total) / 10.0 : 0.0;
+        double coveredLength = ((Number) result.get("covered_length")).doubleValue();
+        double totalLength = ((Number) result.get("total_length")).doubleValue();
+        double pct = totalLength > 0 ? Math.round(coveredLength * 1000.0 / totalLength) / 10.0 : 0.0;
 
-        return ResponseEntity.ok(new CoverageDto(zone, covered, total, pct));
+        return ResponseEntity.ok(new CoverageDto(zone, covered, total, totalLength, pct));
     }
 
     private RowMapper<StreetDto> streetRowMapper() {
@@ -98,9 +107,11 @@ public class StreetsController {
             String wkt = rs.getString("wkt");
             java.sql.Timestamp firstRunAt = rs.getTimestamp("first_run_at");
             java.sql.Timestamp lastRunAt = rs.getTimestamp("last_run_at");
+            double lengthM = rs.getDouble("length_m");
             return new StreetDto(id, zone, name, parseWkt(wkt),
                     firstRunAt != null ? firstRunAt.toLocalDateTime() : null,
-                    lastRunAt  != null ? lastRunAt.toLocalDateTime()  : null);
+                    lastRunAt  != null ? lastRunAt.toLocalDateTime()  : null,
+                    lengthM);
         };
     }
 
@@ -120,7 +131,8 @@ public class StreetsController {
     }
 
     public record StreetDto(String id, String zone, String name, List<List<Double>> coordinates,
-                            java.time.LocalDateTime firstRunAt, java.time.LocalDateTime lastRunAt) {}
-    public record ZoneDto(String name, long covered, long total, double percentage) {}
-    public record CoverageDto(String zone, long covered, long total, double percentage) {}
+                            java.time.LocalDateTime firstRunAt, java.time.LocalDateTime lastRunAt,
+                            double lengthM) {}
+    public record ZoneDto(String name, long covered, long total, double totalLengthM, double percentage) {}
+    public record CoverageDto(String zone, long covered, long total, double totalLengthM, double percentage) {}
 }

@@ -10,12 +10,14 @@ interface Street {
   coordinates: number[][]
   firstRunAt: string | null
   lastRunAt: string | null
+  lengthM: number
 }
 
 interface Zone {
   name: string
   covered: number
   total: number
+  totalLengthM: number
   percentage: number
 }
 
