@@ -15,6 +15,7 @@ interface Track {
 
 interface PolylineEntry {
   polyline: L.Polyline
+  glow: L.Polyline
   firstRunAt: number | null // epoch ms, null = toujours visible
 }
 
@@ -56,8 +57,9 @@ export default function LeafletMap({ tracks, selectedDate }: {
     if (!map) return
 
     // Supprimer les anciennes polylines
-    for (const { polyline } of polylinesRef.current) {
+    for (const { polyline, glow } of polylinesRef.current) {
       polyline.remove()
+      glow.remove()
     }
     polylinesRef.current = []
 
@@ -66,15 +68,26 @@ export default function LeafletMap({ tracks, selectedDate }: {
     for (const track of tracks) {
       if (track.coordinates.length < 2) continue
       const latlngs = track.coordinates as L.LatLngTuple[]
+
+      // Glow effect (tracé plus large et flou en dessous)
+      const glow = L.polyline(latlngs, {
+        color: '#FC4C02',
+        weight: 6,
+        opacity: 0.15,
+        smoothFactor: 1.5,
+      }).addTo(map)
+
       const polyline = L.polyline(latlngs, {
         color: '#FC4C02',
-        weight: 2,
-        opacity: 0.65,
+        weight: 2.5,
+        opacity: 0.8,
         smoothFactor: 1,
       }).addTo(map)
+
       allBounds.push(polyline.getBounds())
       polylinesRef.current.push({
         polyline,
+        glow,
         firstRunAt: track.firstRunAt ? new Date(track.firstRunAt).getTime() : null,
       })
     }
@@ -89,11 +102,17 @@ export default function LeafletMap({ tracks, selectedDate }: {
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
-    for (const { polyline, firstRunAt } of polylinesRef.current) {
+    for (const { polyline, glow, firstRunAt } of polylinesRef.current) {
       if (firstRunAt == null || firstRunAt <= selectedDate) {
-        if (!map.hasLayer(polyline)) polyline.addTo(map)
+        if (!map.hasLayer(polyline)) {
+          glow.addTo(map)
+          polyline.addTo(map)
+        }
       } else {
-        if (map.hasLayer(polyline)) polyline.remove()
+        if (map.hasLayer(polyline)) {
+          polyline.remove()
+          glow.remove()
+        }
       }
     }
   }, [selectedDate])

@@ -22,7 +22,35 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+:root {
+  --strava-orange: #FC4C02;
+  --strava-orange-hover: #E34402;
+}
+
+/* Leaflet Customization */
+.leaflet-container {
+  background: #0a0a0a !important;
+}
+
+.leaflet-control-zoom {
+  border: none !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important;
+}
+
+.leaflet-control-zoom-in,
+.leaflet-control-zoom-out {
+  background-color: #18181b !important; /* zinc-900 */
+  color: #a1a1aa !important; /* zinc-400 */
+  border-bottom: 1px solid #27272a !important; /* zinc-800 */
+}
+
+.leaflet-control-zoom-in:hover,
+.leaflet-control-zoom-out:hover {
+  background-color: #27272a !important;
+  color: #ffffff !important;
 }
 
 @keyframes slide {

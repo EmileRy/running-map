@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { Spinner } from './Spinner'
 
 type ImportStatus = 'PENDING' | 'RUNNING' | 'COMPUTING_STREETS' | 'DONE' | 'ERROR'
 
@@ -19,14 +20,6 @@ interface Props {
   zonesCount?: number
 }
 
-function Spinner() {
-  return (
-    <svg className="h-4 w-4 animate-spin text-[#FC4C02]" viewBox="0 0 24 24" fill="none">
-      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-      <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-    </svg>
-  )
-}
 
 export function ImportPanel({ onStatusChange, onLoadingChange, tracksCount = 0, zonesCount = 0 }: Props) {
   const [job, setJob] = useState<ImportJob | null>(null)
@@ -127,27 +120,38 @@ export function ImportPanel({ onStatusChange, onLoadingChange, tracksCount = 0, 
       ? `${Math.round(tracksCount / 1000)}k`
       : `${tracksCount}`
     return (
-      <div className="flex flex-col items-center gap-6 text-center">
-        <div className="flex gap-8">
-          <div className="flex flex-col items-center gap-1">
-            <span className="text-3xl font-semibold text-white">{job.totalActivities}</span>
-            <span className="text-xs text-zinc-500">course{job.totalActivities > 1 ? 's' : ''}</span>
+      <div className="flex flex-col items-center gap-8 text-center w-full">
+        <div className="grid grid-cols-3 gap-4 w-full">
+          <div className="flex flex-col items-center gap-2 p-3 rounded-2xl bg-zinc-800/50 border border-zinc-700/50">
+            <span className="text-2xl font-bold text-white tabular-nums">{job.totalActivities}</span>
+            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-tighter">Courses</span>
           </div>
-          <div className="flex flex-col items-center gap-1">
-            <span className="text-3xl font-semibold text-white">{streetsLabel}</span>
-            <span className="text-xs text-zinc-500">rues couvertes</span>
+          <div className="flex flex-col items-center gap-2 p-3 rounded-2xl bg-zinc-800/50 border border-zinc-700/50">
+            <span className="text-2xl font-bold text-white tabular-nums">{streetsLabel}</span>
+            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-tighter">Rues</span>
           </div>
-          <div className="flex flex-col items-center gap-1">
-            <span className="text-3xl font-semibold text-white">{zonesCount}</span>
-            <span className="text-xs text-zinc-500">zone{zonesCount > 1 ? 's' : ''}</span>
+          <div className="flex flex-col items-center gap-2 p-3 rounded-2xl bg-zinc-800/50 border border-zinc-700/50">
+            <span className="text-2xl font-bold text-white tabular-nums">{zonesCount}</span>
+            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-tighter">Zones</span>
           </div>
         </div>
         <button
           onClick={startImport}
           disabled={loading}
-          className="rounded-full bg-white px-6 py-3 font-semibold text-black transition-opacity hover:opacity-80 disabled:opacity-50 w-full"
+          className="group relative flex items-center justify-center gap-2 rounded-2xl bg-[#FC4C02] px-6 py-4 font-bold text-white transition-all hover:bg-[#E34402] hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 w-full shadow-lg shadow-[#FC4C02]/20"
         >
-          {loading ? 'Démarrage…' : 'Relancer la synchronisation'}
+          {loading ? (
+            <Spinner />
+          ) : (
+            <>
+              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" strokeLinecap="round" strokeLinejoin="round" />
+                <polyline points="7 10 12 15 17 10" strokeLinecap="round" strokeLinejoin="round" />
+                <line x1="12" y1="15" x2="12" y2="3" strokeLinecap="round" />
+              </svg>
+              Relancer la synchronisation
+            </>
+          )}
         </button>
       </div>
     )
@@ -172,9 +176,20 @@ export function ImportPanel({ onStatusChange, onLoadingChange, tracksCount = 0, 
     <button
       onClick={startImport}
       disabled={loading}
-      className="rounded-full bg-white px-6 py-3 font-semibold text-black transition-opacity hover:opacity-80 disabled:opacity-50"
+      className="group relative flex items-center justify-center gap-3 rounded-2xl bg-[#FC4C02] px-8 py-4 font-bold text-white transition-all hover:bg-[#E34402] hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 shadow-lg shadow-[#FC4C02]/20"
     >
-      {loading ? 'Démarrage…' : 'Importer mes activités Strava'}
+      {loading ? (
+        <Spinner />
+      ) : (
+        <>
+          <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" strokeLinecap="round" strokeLinejoin="round" />
+            <polyline points="7 10 12 15 17 10" strokeLinecap="round" strokeLinejoin="round" />
+            <line x1="12" y1="15" x2="12" y2="3" strokeLinecap="round" />
+          </svg>
+          Importer mes activités Strava
+        </>
+      )}
     </button>
   )
 }

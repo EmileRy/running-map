@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
+import { Spinner } from './Spinner'
 import { MapView } from './MapView'
 import { ImportPanel, type ImportJob } from './ImportPanel'
 
@@ -108,41 +109,47 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
 
   return (
     <div className="flex flex-1 flex-col min-h-0">
-      {/* Header */}
-      <header className="flex items-center justify-between px-4 py-3 bg-zinc-900 text-white shrink-0 z-10">
-        <div className="flex items-center gap-3">
-          <span className="font-semibold tracking-tight">Running Map</span>
-          {isImporting && (
-            <div className="flex items-center gap-2 rounded-full bg-zinc-800 px-3 py-1">
-              <svg className="h-3.5 w-3.5 animate-spin text-[#FC4C02]" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-                <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+      {/* Header - Barre flottante */}
+      <header className="fixed top-4 left-4 right-4 flex items-center justify-between px-4 py-2 bg-zinc-900/80 backdrop-blur-md text-white rounded-2xl border border-zinc-800 shadow-2xl z-[1100]">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <div className="h-8 w-8 rounded-lg bg-[#FC4C02] flex items-center justify-center shadow-lg shadow-[#FC4C02]/20">
+              <svg className="h-5 w-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                <path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
-              <span className="text-xs text-zinc-400">
+            </div>
+            <span className="font-bold tracking-tight text-lg">Running Map</span>
+          </div>
+
+          {isImporting && (
+            <div className="hidden sm:flex items-center gap-2 rounded-full bg-zinc-800/50 border border-zinc-700/50 px-3 py-1 animate-pulse">
+              <Spinner className="h-3 w-3" />
+              <span className="text-[10px] uppercase tracking-wider font-bold text-zinc-400">
                 {importJob && importJob.totalActivities > 0
                   ? `${importJob.processedActivities} / ${importJob.totalActivities}`
-                  : 'Import…'}
+                  : 'Synchro…'}
               </span>
             </div>
           )}
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-4">
           {/* Zone selector */}
           {zones.length > 0 && (
-            <div className="relative">
+            <div className="relative hidden md:block">
               <select
                 value={selectedZone ?? ''}
                 onChange={e => setSelectedZone(e.target.value || null)}
-                className="appearance-none rounded-full bg-zinc-800 pl-3 pr-8 py-1.5 text-sm text-zinc-200 border border-zinc-700 cursor-pointer hover:bg-zinc-700 transition-colors focus:outline-none"
+                className="appearance-none rounded-xl bg-zinc-800/50 pl-3 pr-9 py-1.5 text-sm text-zinc-200 border border-zinc-700/50 cursor-pointer hover:bg-zinc-700/50 transition-all focus:outline-none focus:ring-2 focus:ring-[#FC4C02]/50"
               >
                 <option value="">Toutes les zones</option>
                 {zones.map(z => (
                   <option key={z.name} value={z.name}>{z.name}</option>
                 ))}
               </select>
-              <svg className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M2 4l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+              <svg className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
               </svg>
             </div>
           )}
@@ -151,40 +158,54 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
           <div className="relative" ref={menuRef}>
             <button
               onClick={() => setMenuOpen((o) => !o)}
-              className="flex items-center gap-2 rounded-full px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-800 transition-colors"
+              className="flex items-center gap-2 rounded-xl bg-zinc-800/50 p-1 pr-3 border border-zinc-700/50 hover:bg-zinc-700/50 transition-all"
             >
-              {user.profilePicture && (
-                <img src={user.profilePicture} alt="" className="h-6 w-6 rounded-full object-cover" />
-              )}
-              <span>{user.firstname} {user.lastname}</span>
-              <svg className={`h-3.5 w-3.5 transition-transform ${menuOpen ? 'rotate-180' : ''}`} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M2 4l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+              <div className="h-7 w-7 rounded-lg overflow-hidden border border-zinc-600/50 shadow-inner bg-zinc-700">
+                {user.profilePicture ? (
+                  <img src={user.profilePicture} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <div className="h-full w-full flex items-center justify-center text-[10px] font-bold text-zinc-400">
+                    {user.firstname[0]}{user.lastname[0]}
+                  </div>
+                )}
+              </div>
+              <span className="hidden sm:inline text-sm font-medium text-zinc-200">{user.firstname}</span>
+              <svg className={`h-4 w-4 text-zinc-500 transition-transform duration-200 ${menuOpen ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
               </svg>
             </button>
 
             {menuOpen && (
-              <div className="absolute right-0 top-full mt-1 w-52 rounded-lg border border-zinc-700 bg-zinc-800 py-1 shadow-xl">
+              <div className="absolute right-0 top-full mt-2 w-56 rounded-2xl border border-zinc-800 bg-zinc-900/95 backdrop-blur-xl p-1 shadow-2xl z-[1200] overflow-hidden">
+                <div className="px-3 py-2 border-b border-zinc-800/50 mb-1">
+                  <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Compte</p>
+                  <p className="text-sm font-semibold text-zinc-200 truncate">{user.firstname} {user.lastname}</p>
+                </div>
                 <button
                   onClick={() => { setImportOpen(true); setMenuOpen(false) }}
-                  className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-zinc-200 hover:bg-zinc-700 transition-colors"
+                  className="group flex w-full items-center gap-3 px-3 py-2.5 text-sm font-medium text-zinc-300 hover:bg-[#FC4C02] hover:text-white rounded-xl transition-all"
                 >
-                  <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" strokeLinecap="round" strokeLinejoin="round" />
-                    <polyline points="7 10 12 15 17 10" strokeLinecap="round" strokeLinejoin="round" />
-                    <line x1="12" y1="15" x2="12" y2="3" strokeLinecap="round" />
-                  </svg>
-                  Importer mes courses
+                  <div className="h-8 w-8 rounded-lg bg-zinc-800 flex items-center justify-center group-hover:bg-white/20 transition-colors">
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" strokeLinecap="round" strokeLinejoin="round" />
+                      <polyline points="7 10 12 15 17 10" strokeLinecap="round" strokeLinejoin="round" />
+                      <line x1="12" y1="15" x2="12" y2="3" strokeLinecap="round" />
+                    </svg>
+                  </div>
+                  Synchroniser Strava
                 </button>
-                <div className="my-1 border-t border-zinc-700" />
+                <div className="my-1 border-t border-zinc-800/50" />
                 <a
                   href="/api/auth/logout"
-                  className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200 transition-colors"
+                  className="flex w-full items-center gap-3 px-3 py-2.5 text-sm font-medium text-zinc-500 hover:bg-red-500/10 hover:text-red-400 rounded-xl transition-all"
                 >
-                  <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" strokeLinecap="round" strokeLinejoin="round" />
-                    <polyline points="16 17 21 12 16 7" strokeLinecap="round" strokeLinejoin="round" />
-                    <line x1="21" y1="12" x2="9" y2="12" strokeLinecap="round" />
-                  </svg>
+                   <div className="h-8 w-8 rounded-lg bg-zinc-800/50 flex items-center justify-center">
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" strokeLinecap="round" strokeLinejoin="round" />
+                      <polyline points="16 17 21 12 16 7" strokeLinecap="round" strokeLinejoin="round" />
+                      <line x1="21" y1="12" x2="9" y2="12" strokeLinecap="round" />
+                    </svg>
+                  </div>
                   Se déconnecter
                 </a>
               </div>
@@ -198,50 +219,77 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
         <MapView tracks={visibleTracks} selectedDate={selectedDate} />
 
         {mounted && (
-          <div className="absolute bottom-0 left-0 right-0 z-[1000] px-6 pb-5 pt-10 bg-gradient-to-t from-black/70 to-transparent pointer-events-none">
-            <div className="max-w-3xl mx-auto flex flex-col gap-3">
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-full max-w-xl px-4 z-[1000] pointer-events-none">
+            <div className="bg-zinc-900/90 backdrop-blur-xl border border-zinc-800 rounded-3xl p-5 shadow-2xl pointer-events-auto overflow-hidden relative group">
 
-              {/* Badge compteur + date courante */}
-              <div className="flex items-center justify-between">
-                <span className="rounded-full bg-black/60 px-3 py-1 text-xs text-white backdrop-blur-sm">
-                  {zoneStats
-                    ? `${Math.round(runCount / zoneStats.total * 100)}% explorés (${runCount} rue${runCount > 1 ? 's' : ''} couvertes)`
-                    : `${runCount} rue${runCount > 1 ? 's' : ''} couvertes`}
-                </span>
+              {/* Fond décoratif subtil */}
+              <div className="absolute -right-10 -top-10 w-40 h-40 bg-[#FC4C02]/10 blur-3xl rounded-full pointer-events-none" />
+
+              <div className="relative flex flex-col gap-5">
+                {/* Stats row */}
+                <div className="flex items-end justify-between gap-4">
+                  <div className="flex flex-col gap-1">
+                    <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Exploration</p>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-3xl font-black text-white tabular-nums">
+                        {zoneStats ? Math.round(runCount / zoneStats.total * 100) : '--'}%
+                      </span>
+                      <span className="text-sm font-medium text-zinc-400">
+                        {runCount} rue{runCount > 1 ? 's' : ''}
+                      </span>
+                    </div>
+                  </div>
+
+                  {showSlider && (
+                    <div className="text-right">
+                       <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1">Période</p>
+                       <span className="px-3 py-1 rounded-full bg-zinc-800 text-xs font-bold text-zinc-200 border border-zinc-700 shadow-inner">
+                        {fmt.format(new Date(Math.min(selectedDate, sliderMax)))}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Progress bar / Slider Container */}
                 {showSlider && (
-                  <span className="text-sm font-medium text-white">
-                    {fmt.format(new Date(Math.min(selectedDate, sliderMax)))}
-                  </span>
+                  <div className="flex flex-col gap-3">
+                    <div className="relative h-6 flex items-center">
+                      {/* Custom Range Slider */}
+                      <input
+                        type="range"
+                        min={sliderMin}
+                        max={sliderMax}
+                        value={Math.min(selectedDate, sliderMax)}
+                        onChange={e => setSelectedDate(Number(e.target.value))}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+                      />
+
+                      {/* Track background */}
+                      <div className="absolute inset-y-2 left-0 right-0 bg-zinc-800 rounded-full overflow-hidden">
+                         {/* Highlight track */}
+                         <div
+                          className="h-full bg-gradient-to-r from-[#FC4C02] to-[#FF8C00] transition-all duration-75 shadow-[0_0_15px_rgba(252,76,2,0.3)]"
+                          style={{ width: `${((Math.min(selectedDate, sliderMax) - sliderMin) / (sliderMax - sliderMin)) * 100}%` }}
+                         />
+                      </div>
+
+                      {/* Thumb visual */}
+                      <div
+                        className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 h-5 w-5 bg-white rounded-full shadow-lg pointer-events-none z-10 flex items-center justify-center border-4 border-[#FC4C02]"
+                        style={{ left: `${((Math.min(selectedDate, sliderMax) - sliderMin) / (sliderMax - sliderMin)) * 100}%` }}
+                      >
+                        <div className="h-1 w-1 bg-[#FC4C02] rounded-full animate-ping" />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center px-1">
+                      <span className="text-[10px] font-bold text-zinc-500 uppercase">{fmt.format(new Date(sliderMin))}</span>
+                      <div className="h-px flex-1 mx-4 bg-zinc-800" />
+                      <span className="text-[10px] font-bold text-zinc-500 uppercase">{fmt.format(new Date(sliderMax))}</span>
+                    </div>
+                  </div>
                 )}
               </div>
-
-              {/* Curseur temporel */}
-              {showSlider && (
-                <div className="pointer-events-auto flex flex-col gap-1">
-                  <input
-                    type="range"
-                    min={sliderMin}
-                    max={sliderMax}
-                    value={Math.min(selectedDate, sliderMax)}
-                    onChange={e => setSelectedDate(Number(e.target.value))}
-                    className="w-full h-1.5 appearance-none rounded-full cursor-pointer
-                      [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4
-                      [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full
-                      [&::-webkit-slider-thumb]:bg-[#FC4C02] [&::-webkit-slider-thumb]:cursor-pointer
-                      [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4
-                      [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-[#FC4C02]
-                      [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer"
-                    style={{
-                      background: `linear-gradient(to right, #FC4C02 0%, #FC4C02 ${((Math.min(selectedDate, sliderMax) - sliderMin) / (sliderMax - sliderMin)) * 100}%, #52525b ${((Math.min(selectedDate, sliderMax) - sliderMin) / (sliderMax - sliderMin)) * 100}%, #52525b 100%)`
-                    }}
-                  />
-                  <div className="flex justify-between text-xs text-zinc-400">
-                    <span>{fmt.format(new Date(sliderMin))}</span>
-                    <span>{fmt.format(new Date(sliderMax))}</span>
-                  </div>
-                </div>
-              )}
-
             </div>
           </div>
         )}
@@ -257,11 +305,14 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
             className="relative w-full max-w-md rounded-2xl bg-zinc-900 p-6 shadow-2xl border border-zinc-700"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="mb-5 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-white">Importer mes courses</h2>
+            <div className="mb-2 flex items-center justify-between">
+              <div className="flex flex-col gap-1">
+                <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Strava Sync</p>
+                <h2 className="text-xl font-bold text-white">Importer mes activités</h2>
+              </div>
               <button
                 onClick={() => setImportOpen(false)}
-                className="rounded-full p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-white transition-colors"
+                className="rounded-xl p-2 text-zinc-500 hover:bg-zinc-800 hover:text-white transition-all border border-transparent hover:border-zinc-700"
                 aria-label="Fermer"
               >
                 <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
