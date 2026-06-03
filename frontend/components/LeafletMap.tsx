@@ -34,6 +34,7 @@ export default function LeafletMap({ tracks, selectedDate }: {
       center: [46.2276, 2.2137],
       zoom: 6,
       zoomControl: true,
+      preferCanvas: true, // ⚡ Bolt: Canvas renderer is much faster for thousands of polylines
     })
 
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
@@ -61,27 +62,38 @@ export default function LeafletMap({ tracks, selectedDate }: {
     }
     polylinesRef.current = []
 
-    const allBounds: L.LatLngBounds[] = []
+    let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180
+    let hasCoords = false
 
     for (const track of tracks) {
       if (track.coordinates.length < 2) continue
       const latlngs = track.coordinates as L.LatLngTuple[]
+
+      // ⚡ Bolt: Manual bounds calculation is faster than creating many LatLngBounds objects
+      for (let i = 0; i < latlngs.length; i++) {
+        const [lat, lng] = latlngs[i]
+        if (lat < minLat) minLat = lat
+        if (lat > maxLat) maxLat = lat
+        if (lng < minLng) minLng = lng
+        if (lng > maxLng) maxLng = lng
+        hasCoords = true
+      }
+
       const polyline = L.polyline(latlngs, {
         color: '#FC4C02',
         weight: 2,
         opacity: 0.65,
         smoothFactor: 1,
       }).addTo(map)
-      allBounds.push(polyline.getBounds())
+
       polylinesRef.current.push({
         polyline,
         firstRunAt: track.firstRunAt ? new Date(track.firstRunAt).getTime() : null,
       })
     }
 
-    if (allBounds.length > 0) {
-      const combined = allBounds.reduce((acc, b) => acc.extend(b), allBounds[0])
-      map.fitBounds(combined, { padding: [32, 32] })
+    if (hasCoords) {
+      map.fitBounds([[minLat, minLng], [maxLat, maxLng]], { padding: [32, 32] })
     }
   }, [tracks])
 
