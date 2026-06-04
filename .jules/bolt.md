@@ -1,0 +1,3 @@
+## 2026-06-04 - [Optimize Leaflet and Slider Response]
+**Learning:** Leaflet's default SVG renderer becomes a bottleneck with thousands of polylines, causing DOM bloat and layout thrashing. Switching to Canvas (`preferCanvas: true`) significantly improves map responsiveness. Additionally, parsing ISO date strings into Date objects inside frequently-triggered `useMemo` hooks (e.g., during slider movement) is expensive and can be avoided by pre-calculating timestamps.
+**Action:** Always enable `preferCanvas: true` for apps with many vector layers and pre-calculate numeric timestamps for any data used in high-frequency interactive components like sliders.
