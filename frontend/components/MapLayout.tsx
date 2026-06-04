@@ -42,7 +42,14 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
   const menuRef = useRef<HTMLDivElement>(null)
 
   const visibleTracks = useMemo(
-    () => selectedZone ? tracks.filter(t => t.zone === selectedZone) : tracks,
+    () => {
+      const filtered = selectedZone ? tracks.filter(t => t.zone === selectedZone) : tracks
+      // Pre-calculate timestamps once to avoid repeated parsing during slider interactions
+      return filtered.map(t => ({
+        ...t,
+        firstRunTime: t.firstRunAt ? new Date(t.firstRunAt).getTime() : null
+      }))
+    },
     [tracks, selectedZone]
   )
 
@@ -51,10 +58,9 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
     let min = Infinity
     let max = -Infinity
     for (const t of visibleTracks) {
-      if (!t.firstRunAt) continue
-      const ms = new Date(t.firstRunAt).getTime()
-      if (ms < min) min = ms
-      if (ms > max) max = ms
+      if (t.firstRunTime === null) continue
+      if (t.firstRunTime < min) min = t.firstRunTime
+      if (t.firstRunTime > max) max = t.firstRunTime
     }
     return {
       minDate: isFinite(min) ? min : null,
@@ -81,7 +87,8 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
     let count = 0
     let length = 0
     for (const t of visibleTracks) {
-      if (!t.firstRunAt || new Date(t.firstRunAt).getTime() <= selectedDate) {
+      // Use pre-calculated timestamp for much better slider performance
+      if (t.firstRunTime === null || t.firstRunTime <= selectedDate) {
         count++
         length += t.lengthM
       }
