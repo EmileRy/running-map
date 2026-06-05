@@ -11,11 +11,12 @@ interface Track {
   coordinates: number[][]
   firstRunAt: string | null
   lastRunAt: string | null
+  firstRunAtMs: number | null
 }
 
 interface PolylineEntry {
   polyline: L.Polyline
-  firstRunAt: number | null // epoch ms, null = toujours visible
+  firstRunAtMs: number | null // epoch ms, null = toujours visible
 }
 
 export default function LeafletMap({ tracks, selectedDate }: {
@@ -34,6 +35,7 @@ export default function LeafletMap({ tracks, selectedDate }: {
       center: [46.2276, 2.2137],
       zoom: 6,
       zoomControl: true,
+      preferCanvas: true, // Optimization: Use Canvas renderer for thousands of polylines
     })
 
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
@@ -61,7 +63,7 @@ export default function LeafletMap({ tracks, selectedDate }: {
     }
     polylinesRef.current = []
 
-    const allBounds: L.LatLngBounds[] = []
+    let combinedBounds: L.LatLngBounds | null = null
 
     for (const track of tracks) {
       if (track.coordinates.length < 2) continue
@@ -72,16 +74,23 @@ export default function LeafletMap({ tracks, selectedDate }: {
         opacity: 0.65,
         smoothFactor: 1,
       }).addTo(map)
-      allBounds.push(polyline.getBounds())
+
+      // Optimization: Manual bounds calculation in a single pass to avoid object allocations
+      const bounds = polyline.getBounds()
+      if (!combinedBounds) {
+        combinedBounds = L.latLngBounds(bounds.getSouthWest(), bounds.getNorthEast())
+      } else {
+        combinedBounds.extend(bounds)
+      }
+
       polylinesRef.current.push({
         polyline,
-        firstRunAt: track.firstRunAt ? new Date(track.firstRunAt).getTime() : null,
+        firstRunAtMs: track.firstRunAtMs,
       })
     }
 
-    if (allBounds.length > 0) {
-      const combined = allBounds.reduce((acc, b) => acc.extend(b), allBounds[0])
-      map.fitBounds(combined, { padding: [32, 32] })
+    if (combinedBounds) {
+      map.fitBounds(combinedBounds, { padding: [32, 32] })
     }
   }, [tracks])
 
@@ -89,8 +98,8 @@ export default function LeafletMap({ tracks, selectedDate }: {
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
-    for (const { polyline, firstRunAt } of polylinesRef.current) {
-      if (firstRunAt == null || firstRunAt <= selectedDate) {
+    for (const { polyline, firstRunAtMs } of polylinesRef.current) {
+      if (firstRunAtMs == null || firstRunAtMs <= selectedDate) {
         if (!map.hasLayer(polyline)) polyline.addTo(map)
       } else {
         if (map.hasLayer(polyline)) polyline.remove()

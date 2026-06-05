@@ -19,6 +19,7 @@ interface Track {
   firstRunAt: string | null
   lastRunAt: string | null
   lengthM: number
+  firstRunAtMs: number | null
 }
 
 interface Zone {
@@ -51,8 +52,8 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
     let min = Infinity
     let max = -Infinity
     for (const t of visibleTracks) {
-      if (!t.firstRunAt) continue
-      const ms = new Date(t.firstRunAt).getTime()
+      const ms = t.firstRunAtMs
+      if (ms === null) continue
       if (ms < min) min = ms
       if (ms > max) max = ms
     }
@@ -81,7 +82,7 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
     let count = 0
     let length = 0
     for (const t of visibleTracks) {
-      if (!t.firstRunAt || new Date(t.firstRunAt).getTime() <= selectedDate) {
+      if (t.firstRunAtMs === null || t.firstRunAtMs <= selectedDate) {
         count++
         length += t.lengthM
       }
