@@ -1,0 +1,3 @@
+## 2026-06-05 - [Optimized Map Rendering and Interaction]
+**Learning:** For maps with thousands of polylines, switching to Leaflet's Canvas renderer (`preferCanvas: true`) is essential to avoid DOM bloat and UI lag. Repeated `Date` parsing of ISO strings inside frequent interaction loops (like a date slider) is a significant bottleneck that can be eliminated by pre-calculating numeric timestamps once.
+**Action:** Always check for repeated expensive operations (parsing, object allocation) in hot paths like slider `onChange` or `useMemo` hooks that depend on high-frequency state. Use `preferCanvas` by default when dealing with large geographic datasets.

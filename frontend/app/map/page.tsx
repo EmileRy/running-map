@@ -11,6 +11,7 @@ interface Street {
   firstRunAt: string | null
   lastRunAt: string | null
   lengthM: number
+  firstRunAtMs: number | null
 }
 
 interface Zone {
@@ -52,7 +53,14 @@ export default async function MapPage() {
     fetchCoveredStreets(token),
     fetchZones(token),
   ])
-  const streetsWithCoords = streets.filter((s) => s.coordinates?.length >= 2)
+
+  // Optimization: Pre-calculate numeric timestamps to avoid repeated parsing during slider interactions
+  const streetsWithCoords = streets
+    .filter((s) => (s.coordinates?.length ?? 0) >= 2)
+    .map((s) => ({
+      ...s,
+      firstRunAtMs: s.firstRunAt ? new Date(s.firstRunAt).getTime() : null,
+    }))
 
   return <MapLayout user={user} tracks={streetsWithCoords} zones={zones} />
 }
