@@ -21,6 +21,10 @@ interface Track {
   lengthM: number
 }
 
+interface TrackWithParsedDate extends Track {
+  firstRunAtMs: number | null
+}
+
 interface Zone {
   name: string
   covered: number
@@ -41,26 +45,28 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
   const prevStatusRef = useRef<string | null | undefined>(undefined)
   const menuRef = useRef<HTMLDivElement>(null)
 
-  const visibleTracks = useMemo(
-    () => selectedZone ? tracks.filter(t => t.zone === selectedZone) : tracks,
-    [tracks, selectedZone]
-  )
+  const visibleTracksMs = useMemo<TrackWithParsedDate[]>(() => {
+    const vt = selectedZone ? tracks.filter(t => t.zone === selectedZone) : tracks
+    return vt.map(t => ({
+      ...t,
+      firstRunAtMs: t.firstRunAt ? new Date(t.firstRunAt).getTime() : null
+    }))
+  }, [tracks, selectedZone])
 
   // Dates min/max calculées uniquement depuis les données (pas de Date.now() ici — hydration mismatch)
   const { minDate, maxDate } = useMemo(() => {
     let min = Infinity
     let max = -Infinity
-    for (const t of visibleTracks) {
-      if (!t.firstRunAt) continue
-      const ms = new Date(t.firstRunAt).getTime()
-      if (ms < min) min = ms
-      if (ms > max) max = ms
+    for (const t of visibleTracksMs) {
+      if (t.firstRunAtMs === null) continue
+      if (t.firstRunAtMs < min) min = t.firstRunAtMs
+      if (t.firstRunAtMs > max) max = t.firstRunAtMs
     }
     return {
       minDate: isFinite(min) ? min : null,
       maxDate: isFinite(max) ? max : null,
     }
-  }, [visibleTracks])
+  }, [visibleTracksMs])
 
   // Infinity = tout afficher (valeur stable côté SSR, jamais rendue dans le DOM)
   const [selectedDate, setSelectedDate] = useState<number>(Infinity)
@@ -80,18 +86,18 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
   const { runCount, coveredLengthM } = useMemo(() => {
     let count = 0
     let length = 0
-    for (const t of visibleTracks) {
-      if (!t.firstRunAt || new Date(t.firstRunAt).getTime() <= selectedDate) {
+    for (const t of visibleTracksMs) {
+      if (t.firstRunAtMs === null || t.firstRunAtMs <= selectedDate) {
         count++
         length += t.lengthM
       }
     }
     return { runCount: count, coveredLengthM: length }
-  }, [visibleTracks, selectedDate])
+  }, [visibleTracksMs, selectedDate])
 
   const zoneStats = selectedZone ? zones.find(z => z.name === selectedZone) ?? null : null
 
-  const showSlider = mounted && visibleTracks.length > 0
+  const showSlider = mounted && visibleTracksMs.length > 0
 
   const isImporting = importLoading || importJob?.status === 'RUNNING' || importJob?.status === 'PENDING'
 
@@ -230,7 +236,7 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
 
       {/* Map + overlay */}
       <div className="flex-1 min-h-0 isolate relative">
-        <MapView tracks={visibleTracks} selectedDate={selectedDate} />
+        <MapView tracks={visibleTracksMs} selectedDate={selectedDate} />
 
         {mounted && (
           <div className="absolute bottom-0 left-0 right-0 z-[1000] px-6 pb-5 pt-10 bg-gradient-to-t from-black/70 to-transparent pointer-events-none">
