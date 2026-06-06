@@ -10,6 +10,7 @@ interface Track {
   firstRunAt: string | null
   lastRunAt: string | null
   lengthM: number
+  firstRunAtMs?: number | null
 }
 
 const LeafletMap = dynamic(() => import('./LeafletMap'), {
