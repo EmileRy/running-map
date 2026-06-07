@@ -11,6 +11,7 @@ interface Track {
   coordinates: number[][]
   firstRunAt: string | null
   lastRunAt: string | null
+  firstRunAtMs?: number | null // ⚡ Optimisation : utiliser le timestamp pré-calculé
 }
 
 interface PolylineEntry {
@@ -34,6 +35,7 @@ export default function LeafletMap({ tracks, selectedDate }: {
       center: [46.2276, 2.2137],
       zoom: 6,
       zoomControl: true,
+      preferCanvas: true, // ⚡ Performance : rendu Canvas pour supporter des milliers de polylines
     })
 
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
@@ -61,7 +63,7 @@ export default function LeafletMap({ tracks, selectedDate }: {
     }
     polylinesRef.current = []
 
-    const allBounds: L.LatLngBounds[] = []
+    let combinedBounds: L.LatLngBounds | null = null
 
     for (const track of tracks) {
       if (track.coordinates.length < 2) continue
@@ -72,16 +74,23 @@ export default function LeafletMap({ tracks, selectedDate }: {
         opacity: 0.65,
         smoothFactor: 1,
       }).addTo(map)
-      allBounds.push(polyline.getBounds())
+
+      const bounds = polyline.getBounds()
+      if (!combinedBounds) {
+        combinedBounds = L.latLngBounds(bounds.getSouthWest(), bounds.getNorthEast())
+      } else {
+        combinedBounds.extend(bounds)
+      }
+
       polylinesRef.current.push({
         polyline,
-        firstRunAt: track.firstRunAt ? new Date(track.firstRunAt).getTime() : null,
+        // ⚡ Utilisation du timestamp pré-calculé s'il existe
+        firstRunAt: track.firstRunAtMs !== undefined ? track.firstRunAtMs : (track.firstRunAt ? new Date(track.firstRunAt).getTime() : null),
       })
     }
 
-    if (allBounds.length > 0) {
-      const combined = allBounds.reduce((acc, b) => acc.extend(b), allBounds[0])
-      map.fitBounds(combined, { padding: [32, 32] })
+    if (combinedBounds) {
+      map.fitBounds(combinedBounds, { padding: [32, 32] })
     }
   }, [tracks])
 

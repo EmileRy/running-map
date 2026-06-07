@@ -19,6 +19,7 @@ interface Track {
   firstRunAt: string | null
   lastRunAt: string | null
   lengthM: number
+  firstRunAtMs?: number | null // ⚡ Optimisation : timestamp pré-calculé
 }
 
 interface Zone {
@@ -41,9 +42,18 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
   const prevStatusRef = useRef<string | null | undefined>(undefined)
   const menuRef = useRef<HTMLDivElement>(null)
 
+  // ⚡ Pré-calcul des timestamps pour éviter de parser les dates à chaque mouvement du slider
+  const tracksWithMs = useMemo(() =>
+    tracks.map(t => ({
+      ...t,
+      firstRunAtMs: t.firstRunAt ? new Date(t.firstRunAt).getTime() : null
+    })),
+    [tracks]
+  )
+
   const visibleTracks = useMemo(
-    () => selectedZone ? tracks.filter(t => t.zone === selectedZone) : tracks,
-    [tracks, selectedZone]
+    () => selectedZone ? tracksWithMs.filter(t => t.zone === selectedZone) : tracksWithMs,
+    [tracksWithMs, selectedZone]
   )
 
   // Dates min/max calculées uniquement depuis les données (pas de Date.now() ici — hydration mismatch)
@@ -51,8 +61,8 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
     let min = Infinity
     let max = -Infinity
     for (const t of visibleTracks) {
-      if (!t.firstRunAt) continue
-      const ms = new Date(t.firstRunAt).getTime()
+      if (t.firstRunAtMs === null || t.firstRunAtMs === undefined) continue
+      const ms = t.firstRunAtMs
       if (ms < min) min = ms
       if (ms > max) max = ms
     }
@@ -81,7 +91,8 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
     let count = 0
     let length = 0
     for (const t of visibleTracks) {
-      if (!t.firstRunAt || new Date(t.firstRunAt).getTime() <= selectedDate) {
+      // ⚡ Utilisation du timestamp pré-calculé pour une comparaison numérique rapide
+      if (t.firstRunAtMs === null || t.firstRunAtMs === undefined || t.firstRunAtMs <= selectedDate) {
         count++
         length += t.lengthM
       }
