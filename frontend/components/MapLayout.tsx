@@ -17,6 +17,7 @@ interface Track {
   name: string | null
   coordinates: number[][]
   firstRunAt: string | null
+  firstRunAtMs?: number | null // numeric timestamp for optimized filtering
   lastRunAt: string | null
   lengthM: number
 }
@@ -41,20 +42,27 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
   const prevStatusRef = useRef<string | null | undefined>(undefined)
   const menuRef = useRef<HTMLDivElement>(null)
 
+  // Optimisation : pré-calculer les timestamps une seule fois pour éviter des milliers de 'new Date()' par seconde pendant le slide
+  const tracksWithTimestamps = useMemo(() => {
+    return tracks.map(t => ({
+      ...t,
+      firstRunAtMs: t.firstRunAt ? new Date(t.firstRunAt).getTime() : null
+    }))
+  }, [tracks])
+
   const visibleTracks = useMemo(
-    () => selectedZone ? tracks.filter(t => t.zone === selectedZone) : tracks,
-    [tracks, selectedZone]
+    () => selectedZone ? tracksWithTimestamps.filter(t => t.zone === selectedZone) : tracksWithTimestamps,
+    [tracksWithTimestamps, selectedZone]
   )
 
-  // Dates min/max calculées uniquement depuis les données (pas de Date.now() ici — hydration mismatch)
+  // Dates min/max calculées uniquement depuis les données
   const { minDate, maxDate } = useMemo(() => {
     let min = Infinity
     let max = -Infinity
     for (const t of visibleTracks) {
-      if (!t.firstRunAt) continue
-      const ms = new Date(t.firstRunAt).getTime()
-      if (ms < min) min = ms
-      if (ms > max) max = ms
+      if (t.firstRunAtMs == null) continue
+      if (t.firstRunAtMs < min) min = t.firstRunAtMs
+      if (t.firstRunAtMs > max) max = t.firstRunAtMs
     }
     return {
       minDate: isFinite(min) ? min : null,
@@ -81,7 +89,8 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
     let count = 0
     let length = 0
     for (const t of visibleTracks) {
-      if (!t.firstRunAt || new Date(t.firstRunAt).getTime() <= selectedDate) {
+      // Optimisation : comparaison numérique simple (O(1)) au lieu de parsing de date à chaque rendu du slider
+      if (t.firstRunAtMs == null || t.firstRunAtMs <= selectedDate) {
         count++
         length += t.lengthM
       }
