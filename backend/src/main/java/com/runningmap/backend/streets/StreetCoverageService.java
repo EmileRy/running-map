@@ -78,20 +78,23 @@ public class StreetCoverageService {
         log.info("Computing street coverage for user {}", userId);
 
         // Backfill des activités importées avant l'ajout de track_geom / track_geom_simplified
+        // Optimisation : On calcule ST_MakeLine une seule fois par ligne dans une sous-requête
         int backfilled = jdbcTemplate.update(
             "UPDATE activities SET " +
-            "  track_geom = ST_MakeLine(" +
-            "    array(SELECT ST_SetSRID(ST_MakePoint((c->>1)::float, (c->>0)::float), 4326)" +
+            "  track_geom = sub.geom, " +
+            "  track_geom_simplified = ST_Simplify(sub.geom, 0.0001) " +
+            "FROM (" +
+            "  SELECT id, ST_MakeLine(" +
+            "    array(SELECT ST_SetSRID(ST_MakePoint((c->>1)::float, (c->>0)::float), 4326) " +
             "          FROM jsonb_array_elements(latlng_stream) c)" +
-            ")," +
-            "  track_geom_simplified = ST_Simplify(ST_MakeLine(" +
-            "    array(SELECT ST_SetSRID(ST_MakePoint((c->>1)::float, (c->>0)::float), 4326)" +
-            "          FROM jsonb_array_elements(latlng_stream) c)" +
-            "), 0.0001) " +
-            "WHERE user_id = ?" +
-            "  AND latlng_stream IS NOT NULL" +
-            "  AND jsonb_array_length(latlng_stream) >= 2" +
-            "  AND track_geom IS NULL",
+            "  ) as geom " +
+            "  FROM activities " +
+            "  WHERE user_id = ? " +
+            "    AND latlng_stream IS NOT NULL " +
+            "    AND jsonb_array_length(latlng_stream) >= 2 " +
+            "    AND track_geom IS NULL" +
+            ") sub " +
+            "WHERE activities.id = sub.id",
             userId
         );
         if (backfilled > 0) {

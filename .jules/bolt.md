@@ -1,0 +1,3 @@
+## 2026-06-10 - Track Processing & Map Rendering Optimization
+**Learning:** For interactive map applications with timeline sliders, parsing Date strings in the render loop is a major bottleneck (O(N) * re-renders). Pre-calculating numeric timestamps (epoch ms) and using Leaflet's Canvas renderer instead of SVG significantly improves responsiveness and allows handling thousands of polylines without jank.
+**Action:** Always pre-calculate expensive numeric metrics (timestamps, lengths) outside of frequent render paths (e.g., in useMemo) and prefer Canvas/WebGL for rendering large coordinate datasets on the frontend.
