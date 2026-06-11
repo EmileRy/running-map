@@ -9,6 +9,7 @@ interface Street {
   name: string | null
   coordinates: number[][]
   firstRunAt: string | null
+  firstRunAtMs?: number | null
   lastRunAt: string | null
   lengthM: number
 }

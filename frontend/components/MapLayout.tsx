@@ -17,6 +17,7 @@ interface Track {
   name: string | null
   coordinates: number[][]
   firstRunAt: string | null
+  firstRunAtMs?: number | null
   lastRunAt: string | null
   lengthM: number
 }
@@ -41,9 +42,14 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
   const prevStatusRef = useRef<string | null | undefined>(undefined)
   const menuRef = useRef<HTMLDivElement>(null)
 
+  const tracksWithMs = useMemo(() => tracks.map(t => ({
+    ...t,
+    firstRunAtMs: t.firstRunAt ? new Date(t.firstRunAt).getTime() : null
+  })), [tracks])
+
   const visibleTracks = useMemo(
-    () => selectedZone ? tracks.filter(t => t.zone === selectedZone) : tracks,
-    [tracks, selectedZone]
+    () => selectedZone ? tracksWithMs.filter(t => t.zone === selectedZone) : tracksWithMs,
+    [tracksWithMs, selectedZone]
   )
 
   // Dates min/max calculées uniquement depuis les données (pas de Date.now() ici — hydration mismatch)
@@ -51,8 +57,8 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
     let min = Infinity
     let max = -Infinity
     for (const t of visibleTracks) {
-      if (!t.firstRunAt) continue
-      const ms = new Date(t.firstRunAt).getTime()
+      const ms = t.firstRunAtMs
+      if (ms === null || ms === undefined) continue
       if (ms < min) min = ms
       if (ms > max) max = ms
     }
@@ -67,21 +73,26 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
   // Rendu du slider uniquement côté client pour pouvoir utiliser Date.now() librement
   const [mounted, setMounted] = useState(false)
 
-  useEffect(() => { setMounted(true) }, [])
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
-    setSelectedDate(maxDate ?? Date.now())
+    if (maxDate !== null) {
+      setSelectedDate(maxDate)
+    }
   }, [maxDate])
 
   // Fallbacks client-only (safe car utilisés seulement après montage)
-  const sliderMin = minDate ?? (Date.now() - 5 * 365 * 24 * 60 * 60 * 1000)
-  const sliderMax = maxDate ?? Date.now()
+  const sliderMin = minDate ?? 0
+  const sliderMax = maxDate ?? 0
 
   const { runCount, coveredLengthM } = useMemo(() => {
     let count = 0
     let length = 0
     for (const t of visibleTracks) {
-      if (!t.firstRunAt || new Date(t.firstRunAt).getTime() <= selectedDate) {
+      const ms = t.firstRunAtMs
+      if (ms === null || ms === undefined || ms <= selectedDate) {
         count++
         length += t.lengthM
       }
