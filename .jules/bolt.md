@@ -1,0 +1,3 @@
+## 2026-06-11 - [Frontend Map & Slider Optimization]
+**Learning:** Parsing ISO date strings inside render loops or filtering logic (especially during frequent events like slider movement) is a significant bottleneck. Pre-calculating numeric timestamps in a 'useMemo' hook and using them for comparisons is O(1) and much faster. Additionally, Leaflet's SVG renderer struggles with thousands of polylines; 'preferCanvas: true' and manual single-pass bounds calculation significantly reduce overhead and object allocation.
+**Action:** Always pre-calculate expensive derivations (like Date.getTime()) for large collections in the parent component and pass them down. For maps, favor Canvas rendering and manual loops for bounds over object-heavy helper methods.
