@@ -19,6 +19,7 @@ interface Track {
   firstRunAt: string | null
   lastRunAt: string | null
   lengthM: number
+  firstRunAtMs?: number | null
 }
 
 interface Zone {
@@ -41,57 +42,93 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
   const prevStatusRef = useRef<string | null | undefined>(undefined)
   const menuRef = useRef<HTMLDivElement>(null)
 
-  const visibleTracks = useMemo(
-    () => selectedZone ? tracks.filter(t => t.zone === selectedZone) : tracks,
-    [tracks, selectedZone]
-  )
+  const sortedTracks = useMemo(() => {
+    const filtered = selectedZone ? tracks.filter(t => t.zone === selectedZone) : tracks
+    return filtered
+      .map(t => ({
+        ...t,
+        firstRunAtMs: t.firstRunAt ? new Date(t.firstRunAt).getTime() : null
+      }))
+      .sort((a, b) => (a.firstRunAtMs ?? 0) - (b.firstRunAtMs ?? 0))
+  }, [tracks, selectedZone])
 
   // Dates min/max calculées uniquement depuis les données (pas de Date.now() ici — hydration mismatch)
   const { minDate, maxDate } = useMemo(() => {
+    if (sortedTracks.length === 0) return { minDate: null, maxDate: null }
+
     let min = Infinity
     let max = -Infinity
-    for (const t of visibleTracks) {
-      if (!t.firstRunAt) continue
-      const ms = new Date(t.firstRunAt).getTime()
-      if (ms < min) min = ms
-      if (ms > max) max = ms
+
+    for (const t of sortedTracks) {
+      if (t.firstRunAtMs == null) continue
+      if (t.firstRunAtMs < min) min = t.firstRunAtMs
+      if (t.firstRunAtMs > max) max = t.firstRunAtMs
     }
+
     return {
       minDate: isFinite(min) ? min : null,
       maxDate: isFinite(max) ? max : null,
     }
-  }, [visibleTracks])
+  }, [sortedTracks])
 
   // Infinity = tout afficher (valeur stable côté SSR, jamais rendue dans le DOM)
   const [selectedDate, setSelectedDate] = useState<number>(Infinity)
   // Rendu du slider uniquement côté client pour pouvoir utiliser Date.now() librement
   const [mounted, setMounted] = useState(false)
+  const [now, setNow] = useState(0)
 
-  useEffect(() => { setMounted(true) }, [])
+  const [prevMaxDate, setPrevMaxDate] = useState<number | null>(null)
+
+  // Pattern "adjust state during render" pour éviter les cascades de rendus et les warnings lint
+  if (maxDate !== prevMaxDate) {
+    setPrevMaxDate(maxDate)
+    // On évite Date.now() ici car impur, on utilise une valeur par défaut ou Infinity
+    setSelectedDate(maxDate ?? Infinity)
+  }
 
   useEffect(() => {
-    setSelectedDate(maxDate ?? Date.now())
-  }, [maxDate])
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setNow(Date.now())
+    setMounted(true)
+  }, [])
 
-  // Fallbacks client-only (safe car utilisés seulement après montage)
-  const sliderMin = minDate ?? (Date.now() - 5 * 365 * 24 * 60 * 60 * 1000)
-  const sliderMax = maxDate ?? Date.now()
+  // Valeurs stables pour le rendu (pureté React)
+  const sliderMin = minDate ?? (now - 5 * 365 * 24 * 60 * 60 * 1000)
+  const sliderMax = maxDate ?? now
+
+  // Somme cumulée des longueurs pour calcul O(1) après recherche dichotomique
+  const prefixSums = useMemo(() => {
+    const sums = new Float64Array(sortedTracks.length + 1)
+    for (let i = 0; i < sortedTracks.length; i++) {
+      sums[i + 1] = sums[i] + sortedTracks[i].lengthM
+    }
+    return sums
+  }, [sortedTracks])
 
   const { runCount, coveredLengthM } = useMemo(() => {
-    let count = 0
-    let length = 0
-    for (const t of visibleTracks) {
-      if (!t.firstRunAt || new Date(t.firstRunAt).getTime() <= selectedDate) {
-        count++
-        length += t.lengthM
+    if (selectedDate === Infinity) {
+      return { runCount: sortedTracks.length, coveredLengthM: prefixSums[sortedTracks.length] }
+    }
+
+    // Recherche dichotomique pour trouver le nombre de tracks visibles à selectedDate (O(log N))
+    let low = 0
+    let high = sortedTracks.length
+    while (low < high) {
+      const mid = (low + high) >>> 1
+      const t = sortedTracks[mid]
+      if (t.firstRunAtMs != null && t.firstRunAtMs <= selectedDate) {
+        low = mid + 1
+      } else {
+        high = mid
       }
     }
-    return { runCount: count, coveredLengthM: length }
-  }, [visibleTracks, selectedDate])
+
+    return { runCount: low, coveredLengthM: prefixSums[low] }
+  }, [sortedTracks, prefixSums, selectedDate])
 
   const zoneStats = selectedZone ? zones.find(z => z.name === selectedZone) ?? null : null
 
-  const showSlider = mounted && visibleTracks.length > 0
+  const showSlider = mounted && sortedTracks.length > 0
 
   const isImporting = importLoading || importJob?.status === 'RUNNING' || importJob?.status === 'PENDING'
 
@@ -111,7 +148,10 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
     if (res.ok) handleStatusChange(await res.json())
   }, [handleStatusChange])
 
-  useEffect(() => { fetchStatus() }, [fetchStatus])
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchStatus()
+  }, [fetchStatus])
 
   useEffect(() => {
     const active = ['PENDING', 'RUNNING', 'COMPUTING_STREETS']
@@ -230,7 +270,7 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
 
       {/* Map + overlay */}
       <div className="flex-1 min-h-0 isolate relative">
-        <MapView tracks={visibleTracks} selectedDate={selectedDate} />
+        <MapView tracks={sortedTracks} selectedDate={selectedDate} />
 
         {mounted && (
           <div className="absolute bottom-0 left-0 right-0 z-[1000] px-6 pb-5 pt-10 bg-gradient-to-t from-black/70 to-transparent pointer-events-none">
