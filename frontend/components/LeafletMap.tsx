@@ -10,6 +10,7 @@ interface Track {
   name: string | null
   coordinates: number[][]
   firstRunAt: string | null
+  firstRunAtMs: number | null
   lastRunAt: string | null
 }
 
@@ -34,6 +35,7 @@ export default function LeafletMap({ tracks, selectedDate }: {
       center: [46.2276, 2.2137],
       zoom: 6,
       zoomControl: true,
+      preferCanvas: true, // Optimization: Use Canvas renderer for better performance with many polylines
     })
 
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
@@ -61,7 +63,7 @@ export default function LeafletMap({ tracks, selectedDate }: {
     }
     polylinesRef.current = []
 
-    const allBounds: L.LatLngBounds[] = []
+    let combinedBounds: L.LatLngBounds | null = null
 
     for (const track of tracks) {
       if (track.coordinates.length < 2) continue
@@ -72,16 +74,22 @@ export default function LeafletMap({ tracks, selectedDate }: {
         opacity: 0.65,
         smoothFactor: 1,
       }).addTo(map)
-      allBounds.push(polyline.getBounds())
+
+      const bounds = polyline.getBounds()
+      if (!combinedBounds) {
+        combinedBounds = L.latLngBounds(bounds.getSouthWest(), bounds.getNorthEast())
+      } else {
+        combinedBounds.extend(bounds)
+      }
+
       polylinesRef.current.push({
         polyline,
-        firstRunAt: track.firstRunAt ? new Date(track.firstRunAt).getTime() : null,
+        firstRunAt: track.firstRunAtMs,
       })
     }
 
-    if (allBounds.length > 0) {
-      const combined = allBounds.reduce((acc, b) => acc.extend(b), allBounds[0])
-      map.fitBounds(combined, { padding: [32, 32] })
+    if (combinedBounds) {
+      map.fitBounds(combinedBounds, { padding: [32, 32] })
     }
   }, [tracks])
 

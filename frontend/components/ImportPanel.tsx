@@ -43,7 +43,13 @@ export function ImportPanel({ onStatusChange, onLoadingChange, tracksCount = 0, 
     if (res.ok) updateJob(await res.json())
   }, [updateJob])
 
-  useEffect(() => { fetchStatus() }, [fetchStatus])
+  useEffect(() => {
+    // Use setTimeout to defer execution and avoid synchronous update warnings
+    const timeoutId = setTimeout(() => {
+      void fetchStatus()
+    }, 0)
+    return () => clearTimeout(timeoutId)
+  }, [fetchStatus])
 
   useEffect(() => {
     const active: ImportStatus[] = ['PENDING', 'RUNNING', 'COMPUTING_STREETS']
