@@ -1,0 +1,3 @@
+## 2025-05-15 - [Date Filtering Optimization in React 19]
+**Learning:** In React 19, frequent date parsing (`new Date().getTime()`) during user interactions like slider scrubbing causes measurable jank. Additionally, strict purity and cascading render rules in React 19 require careful handling of `Date.now()` and side-effect-driven state updates.
+**Action:** Always pre-calculate numeric timestamps for date fields in a memoized phase. Use `useSyncExternalStore` for hydration-safe access to browser-only globals like `Date.now()` to satisfy purity rules. Defer state updates in effects with `setTimeout(..., 0)` to avoid cascading render warnings.
