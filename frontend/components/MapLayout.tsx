@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo, useSyncExternalStore } from 'react'
 import { useRouter } from 'next/navigation'
 import { MapView } from './MapView'
 import { ImportPanel, type ImportJob } from './ImportPanel'
@@ -11,7 +11,7 @@ interface User {
   profilePicture?: string
 }
 
-interface Track {
+export interface Track {
   id: string
   zone: string
   name: string | null
@@ -19,6 +19,7 @@ interface Track {
   firstRunAt: string | null
   lastRunAt: string | null
   lengthM: number
+  firstRunAtMs?: number | null
 }
 
 interface Zone {
@@ -41,9 +42,16 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
   const prevStatusRef = useRef<string | null | undefined>(undefined)
   const menuRef = useRef<HTMLDivElement>(null)
 
+  const enrichedTracks = useMemo(() => {
+    return tracks.map(t => ({
+      ...t,
+      firstRunAtMs: t.firstRunAt ? new Date(t.firstRunAt).getTime() : null
+    }))
+  }, [tracks])
+
   const visibleTracks = useMemo(
-    () => selectedZone ? tracks.filter(t => t.zone === selectedZone) : tracks,
-    [tracks, selectedZone]
+    () => selectedZone ? enrichedTracks.filter(t => t.zone === selectedZone) : enrichedTracks,
+    [enrichedTracks, selectedZone]
   )
 
   // Dates min/max calculées uniquement depuis les données (pas de Date.now() ici — hydration mismatch)
@@ -51,8 +59,8 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
     let min = Infinity
     let max = -Infinity
     for (const t of visibleTracks) {
-      if (!t.firstRunAt) continue
-      const ms = new Date(t.firstRunAt).getTime()
+      const ms = t.firstRunAtMs
+      if (ms == null) continue
       if (ms < min) min = ms
       if (ms > max) max = ms
     }
@@ -64,24 +72,39 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
 
   // Infinity = tout afficher (valeur stable côté SSR, jamais rendue dans le DOM)
   const [selectedDate, setSelectedDate] = useState<number>(Infinity)
-  // Rendu du slider uniquement côté client pour pouvoir utiliser Date.now() librement
-  const [mounted, setMounted] = useState(false)
 
-  useEffect(() => { setMounted(true) }, [])
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  )
+
+  const now = useSyncExternalStore(
+    () => () => {},
+    () => Date.now(),
+    () => 0
+  )
 
   useEffect(() => {
-    setSelectedDate(maxDate ?? Date.now())
-  }, [maxDate])
+    const timer = setTimeout(() => {
+      if (maxDate) {
+        setSelectedDate(maxDate)
+      } else if (now) {
+        setSelectedDate(now)
+      }
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [maxDate, now])
 
   // Fallbacks client-only (safe car utilisés seulement après montage)
-  const sliderMin = minDate ?? (Date.now() - 5 * 365 * 24 * 60 * 60 * 1000)
-  const sliderMax = maxDate ?? Date.now()
+  const sliderMin = minDate ?? (now ? now - 5 * 365 * 24 * 60 * 60 * 1000 : 0)
+  const sliderMax = maxDate ?? now
 
   const { runCount, coveredLengthM } = useMemo(() => {
     let count = 0
     let length = 0
     for (const t of visibleTracks) {
-      if (!t.firstRunAt || new Date(t.firstRunAt).getTime() <= selectedDate) {
+      if (t.firstRunAtMs == null || t.firstRunAtMs <= selectedDate) {
         count++
         length += t.lengthM
       }
@@ -108,10 +131,18 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
   const fetchStatus = useCallback(async () => {
     const res = await fetch('/api/import/status')
     if (res.status === 204) { handleStatusChange(null); return }
-    if (res.ok) handleStatusChange(await res.json())
+    if (res.ok) {
+      const data = await res.json()
+      handleStatusChange(data)
+    }
   }, [handleStatusChange])
 
-  useEffect(() => { fetchStatus() }, [fetchStatus])
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchStatus()
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [fetchStatus])
 
   useEffect(() => {
     const active = ['PENDING', 'RUNNING', 'COMPUTING_STREETS']
