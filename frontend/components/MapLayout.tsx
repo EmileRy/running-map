@@ -1,24 +1,15 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo, useSyncExternalStore } from 'react'
 import { useRouter } from 'next/navigation'
 import { MapView } from './MapView'
 import { ImportPanel, type ImportJob } from './ImportPanel'
+import { type Track } from '@/types/track'
 
 interface User {
   firstname: string
   lastname: string
   profilePicture?: string
-}
-
-interface Track {
-  id: string
-  zone: string
-  name: string | null
-  coordinates: number[][]
-  firstRunAt: string | null
-  lastRunAt: string | null
-  lengthM: number
 }
 
 interface Zone {
@@ -31,6 +22,8 @@ interface Zone {
 
 const fmt = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
 
+const subscribe = () => () => {}
+
 export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]; zones: Zone[] }) {
   const router = useRouter()
   const [menuOpen, setMenuOpen] = useState(false)
@@ -41,9 +34,17 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
   const prevStatusRef = useRef<string | null | undefined>(undefined)
   const menuRef = useRef<HTMLDivElement>(null)
 
+  // Pré-calcul des timestamps numériques pour éviter de parser les dates pendant les interactions du slider (O(1) filtering)
+  const tracksWithMs = useMemo(() => {
+    return tracks.map(t => ({
+      ...t,
+      firstRunAtMs: t.firstRunAt ? new Date(t.firstRunAt).getTime() : undefined
+    }))
+  }, [tracks])
+
   const visibleTracks = useMemo(
-    () => selectedZone ? tracks.filter(t => t.zone === selectedZone) : tracks,
-    [tracks, selectedZone]
+    () => selectedZone ? tracksWithMs.filter(t => t.zone === selectedZone) : tracksWithMs,
+    [tracksWithMs, selectedZone]
   )
 
   // Dates min/max calculées uniquement depuis les données (pas de Date.now() ici — hydration mismatch)
@@ -51,8 +52,8 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
     let min = Infinity
     let max = -Infinity
     for (const t of visibleTracks) {
-      if (!t.firstRunAt) continue
-      const ms = new Date(t.firstRunAt).getTime()
+      if (t.firstRunAtMs === undefined) continue
+      const ms = t.firstRunAtMs
       if (ms < min) min = ms
       if (ms > max) max = ms
     }
@@ -64,24 +65,30 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
 
   // Infinity = tout afficher (valeur stable côté SSR, jamais rendue dans le DOM)
   const [selectedDate, setSelectedDate] = useState<number>(Infinity)
-  // Rendu du slider uniquement côté client pour pouvoir utiliser Date.now() librement
-  const [mounted, setMounted] = useState(false)
 
-  useEffect(() => { setMounted(true) }, [])
+  // Hydration-safe mounting check for React 19
+  const mounted = useSyncExternalStore(subscribe, () => true, () => false)
+
+  // Get a stable "now" timestamp at mount time to avoid infinite loops and satisfy purity
+  const mountNow = useSyncExternalStore(subscribe, () => Date.now(), () => 0)
 
   useEffect(() => {
-    setSelectedDate(maxDate ?? Date.now())
-  }, [maxDate])
+    if (maxDate !== null) {
+      setTimeout(() => setSelectedDate(maxDate), 0)
+    } else if (mountNow > 0) {
+      setTimeout(() => setSelectedDate(mountNow), 0)
+    }
+  }, [maxDate, mountNow])
 
   // Fallbacks client-only (safe car utilisés seulement après montage)
-  const sliderMin = minDate ?? (Date.now() - 5 * 365 * 24 * 60 * 60 * 1000)
-  const sliderMax = maxDate ?? Date.now()
+  const sliderMin = minDate ?? (mountNow > 0 ? mountNow - 5 * 365 * 24 * 60 * 60 * 1000 : 0)
+  const sliderMax = maxDate ?? mountNow
 
   const { runCount, coveredLengthM } = useMemo(() => {
     let count = 0
     let length = 0
     for (const t of visibleTracks) {
-      if (!t.firstRunAt || new Date(t.firstRunAt).getTime() <= selectedDate) {
+      if (t.firstRunAtMs === undefined || t.firstRunAtMs <= selectedDate) {
         count++
         length += t.lengthM
       }
@@ -111,7 +118,9 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
     if (res.ok) handleStatusChange(await res.json())
   }, [handleStatusChange])
 
-  useEffect(() => { fetchStatus() }, [fetchStatus])
+  useEffect(() => {
+    setTimeout(fetchStatus, 0)
+  }, [fetchStatus])
 
   useEffect(() => {
     const active = ['PENDING', 'RUNNING', 'COMPUTING_STREETS']
