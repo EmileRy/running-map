@@ -2,16 +2,7 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/auth'
 import { MapLayout } from '@/components/MapLayout'
-
-interface Street {
-  id: string
-  zone: string
-  name: string | null
-  coordinates: number[][]
-  firstRunAt: string | null
-  lastRunAt: string | null
-  lengthM: number
-}
+import type { Track as Street } from '@/types/track'
 
 interface Zone {
   name: string
