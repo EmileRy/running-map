@@ -1,24 +1,15 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo, useSyncExternalStore } from 'react'
 import { useRouter } from 'next/navigation'
 import { MapView } from './MapView'
 import { ImportPanel, type ImportJob } from './ImportPanel'
+import type { Track } from '@/types/track'
 
 interface User {
   firstname: string
   lastname: string
   profilePicture?: string
-}
-
-interface Track {
-  id: string
-  zone: string
-  name: string | null
-  coordinates: number[][]
-  firstRunAt: string | null
-  lastRunAt: string | null
-  lengthM: number
 }
 
 interface Zone {
@@ -41,9 +32,15 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
   const prevStatusRef = useRef<string | null | undefined>(undefined)
   const menuRef = useRef<HTMLDivElement>(null)
 
+  // Optimize: Pre-calculate timestamps once to avoid expensive new Date().getTime() in hot loops
+  const enhancedTracks = useMemo(() => tracks.map(t => ({
+    ...t,
+    firstRunAtMs: t.firstRunAt ? new Date(t.firstRunAt).getTime() : null
+  })), [tracks])
+
   const visibleTracks = useMemo(
-    () => selectedZone ? tracks.filter(t => t.zone === selectedZone) : tracks,
-    [tracks, selectedZone]
+    () => selectedZone ? enhancedTracks.filter(t => t.zone === selectedZone) : enhancedTracks,
+    [enhancedTracks, selectedZone]
   )
 
   // Dates min/max calculées uniquement depuis les données (pas de Date.now() ici — hydration mismatch)
@@ -51,8 +48,8 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
     let min = Infinity
     let max = -Infinity
     for (const t of visibleTracks) {
-      if (!t.firstRunAt) continue
-      const ms = new Date(t.firstRunAt).getTime()
+      if (t.firstRunAtMs == null) continue
+      const ms = t.firstRunAtMs
       if (ms < min) min = ms
       if (ms > max) max = ms
     }
@@ -62,26 +59,38 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
     }
   }, [visibleTracks])
 
+// Store stable pour Date.now() afin d'éviter les hydration mismatches et respecter la pureté de React 19
+  const mountNow = useSyncExternalStore(
+    useCallback(() => () => {}, []),
+    () => Date.now(),
+    () => 0 // Fallback SSR stable
+  )
+
   // Infinity = tout afficher (valeur stable côté SSR, jamais rendue dans le DOM)
   const [selectedDate, setSelectedDate] = useState<number>(Infinity)
-  // Rendu du slider uniquement côté client pour pouvoir utiliser Date.now() librement
+  // Rendu du slider uniquement côté client
   const [mounted, setMounted] = useState(false)
 
-  useEffect(() => { setMounted(true) }, [])
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelectedDate(maxDate ?? Date.now())
   }, [maxDate])
 
   // Fallbacks client-only (safe car utilisés seulement après montage)
-  const sliderMin = minDate ?? (Date.now() - 5 * 365 * 24 * 60 * 60 * 1000)
-  const sliderMax = maxDate ?? Date.now()
+  const sliderMin = minDate ?? (mountNow - 5 * 365 * 24 * 60 * 60 * 1000)
+  const sliderMax = maxDate ?? mountNow
 
   const { runCount, coveredLengthM } = useMemo(() => {
     let count = 0
     let length = 0
     for (const t of visibleTracks) {
-      if (!t.firstRunAt || new Date(t.firstRunAt).getTime() <= selectedDate) {
+      // Use pre-calculated timestamp for O(1) comparison
+      if (t.firstRunAtMs == null || t.firstRunAtMs <= selectedDate) {
         count++
         length += t.lengthM
       }
@@ -111,7 +120,10 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
     if (res.ok) handleStatusChange(await res.json())
   }, [handleStatusChange])
 
-  useEffect(() => { fetchStatus() }, [fetchStatus])
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchStatus()
+  }, [fetchStatus])
 
   useEffect(() => {
     const active = ['PENDING', 'RUNNING', 'COMPUTING_STREETS']

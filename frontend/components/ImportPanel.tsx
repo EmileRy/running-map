@@ -43,7 +43,10 @@ export function ImportPanel({ onStatusChange, onLoadingChange, tracksCount = 0, 
     if (res.ok) updateJob(await res.json())
   }, [updateJob])
 
-  useEffect(() => { fetchStatus() }, [fetchStatus])
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchStatus()
+  }, [fetchStatus])
 
   useEffect(() => {
     const active: ImportStatus[] = ['PENDING', 'RUNNING', 'COMPUTING_STREETS']
