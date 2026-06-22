@@ -4,29 +4,14 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { MapView } from './MapView'
 import { ImportPanel, type ImportJob } from './ImportPanel'
+import { Track } from '@/types/track'
+import { Zone } from '@/types/zone'
+import { useMountNow } from '@/lib/mount-now'
 
 interface User {
   firstname: string
   lastname: string
   profilePicture?: string
-}
-
-interface Track {
-  id: string
-  zone: string
-  name: string | null
-  coordinates: number[][]
-  firstRunAt: string | null
-  lastRunAt: string | null
-  lengthM: number
-}
-
-interface Zone {
-  name: string
-  covered: number
-  total: number
-  totalLengthM: number
-  percentage: number
 }
 
 const fmt = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -47,12 +32,13 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
   )
 
   // Dates min/max calculées uniquement depuis les données (pas de Date.now() ici — hydration mismatch)
+  // Utilise firstRunAtMs pré-calculé pour une performance O(n) sans parsing de date
   const { minDate, maxDate } = useMemo(() => {
     let min = Infinity
     let max = -Infinity
     for (const t of visibleTracks) {
-      if (!t.firstRunAt) continue
-      const ms = new Date(t.firstRunAt).getTime()
+      const ms = t.firstRunAtMs
+      if (ms === undefined) continue
       if (ms < min) min = ms
       if (ms > max) max = ms
     }
@@ -64,24 +50,31 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
 
   // Infinity = tout afficher (valeur stable côté SSR, jamais rendue dans le DOM)
   const [selectedDate, setSelectedDate] = useState<number>(Infinity)
-  // Rendu du slider uniquement côté client pour pouvoir utiliser Date.now() librement
-  const [mounted, setMounted] = useState(false)
 
-  useEffect(() => { setMounted(true) }, [])
+  // useMountNow provides hydration-safe mounting and stable 'now' for pure rendering
+  const { isMounted, now } = useMountNow()
 
   useEffect(() => {
-    setSelectedDate(maxDate ?? Date.now())
-  }, [maxDate])
+    if (isMounted) {
+      // Defer to avoid synchronous setState in effect (React 19 lint rule)
+      const id = setTimeout(() => {
+        setSelectedDate(maxDate ?? now)
+      }, 0)
+      return () => clearTimeout(id)
+    }
+  }, [maxDate, isMounted, now])
 
   // Fallbacks client-only (safe car utilisés seulement après montage)
-  const sliderMin = minDate ?? (Date.now() - 5 * 365 * 24 * 60 * 60 * 1000)
-  const sliderMax = maxDate ?? Date.now()
+  const sliderMin = minDate ?? (now - 5 * 365 * 24 * 60 * 60 * 1000)
+  const sliderMax = maxDate ?? now
 
+  // Calcul des stats ultra-performant grâce à firstRunAtMs (évite des milliers de new Date() par seconde)
   const { runCount, coveredLengthM } = useMemo(() => {
     let count = 0
     let length = 0
     for (const t of visibleTracks) {
-      if (!t.firstRunAt || new Date(t.firstRunAt).getTime() <= selectedDate) {
+      const ms = t.firstRunAtMs
+      if (ms === undefined || ms <= selectedDate) {
         count++
         length += t.lengthM
       }
@@ -91,7 +84,7 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
 
   const zoneStats = selectedZone ? zones.find(z => z.name === selectedZone) ?? null : null
 
-  const showSlider = mounted && visibleTracks.length > 0
+  const showSlider = isMounted && visibleTracks.length > 0
 
   const isImporting = importLoading || importJob?.status === 'RUNNING' || importJob?.status === 'PENDING'
 
@@ -111,7 +104,11 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
     if (res.ok) handleStatusChange(await res.json())
   }, [handleStatusChange])
 
-  useEffect(() => { fetchStatus() }, [fetchStatus])
+  useEffect(() => {
+    // Defer to avoid synchronous setState in effect (React 19 lint rule)
+    const id = setTimeout(fetchStatus, 0)
+    return () => clearTimeout(id)
+  }, [fetchStatus])
 
   useEffect(() => {
     const active = ['PENDING', 'RUNNING', 'COMPUTING_STREETS']
@@ -232,7 +229,7 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
       <div className="flex-1 min-h-0 isolate relative">
         <MapView tracks={visibleTracks} selectedDate={selectedDate} />
 
-        {mounted && (
+        {isMounted && (
           <div className="absolute bottom-0 left-0 right-0 z-[1000] px-6 pb-5 pt-10 bg-gradient-to-t from-black/70 to-transparent pointer-events-none">
             <div className="max-w-3xl mx-auto flex flex-col gap-3">
 
