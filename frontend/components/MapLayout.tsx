@@ -4,29 +4,14 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { MapView } from './MapView'
 import { ImportPanel, type ImportJob } from './ImportPanel'
+import { Track } from '@/types/track'
+import { Zone } from '@/types/zone'
+import { useMountNow } from '@/lib/mount-now'
 
 interface User {
   firstname: string
   lastname: string
   profilePicture?: string
-}
-
-interface Track {
-  id: string
-  zone: string
-  name: string | null
-  coordinates: number[][]
-  firstRunAt: string | null
-  lastRunAt: string | null
-  lengthM: number
-}
-
-interface Zone {
-  name: string
-  covered: number
-  total: number
-  totalLengthM: number
-  percentage: number
 }
 
 const fmt = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -41,18 +26,20 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
   const prevStatusRef = useRef<string | null | undefined>(undefined)
   const menuRef = useRef<HTMLDivElement>(null)
 
+  const { mounted, now } = useMountNow()
+
   const visibleTracks = useMemo(
     () => selectedZone ? tracks.filter(t => t.zone === selectedZone) : tracks,
     [tracks, selectedZone]
   )
 
-  // Dates min/max calculées uniquement depuis les données (pas de Date.now() ici — hydration mismatch)
+  // ⚡ Optimization: Use pre-calculated firstRunAtMs
   const { minDate, maxDate } = useMemo(() => {
     let min = Infinity
     let max = -Infinity
     for (const t of visibleTracks) {
-      if (!t.firstRunAt) continue
-      const ms = new Date(t.firstRunAt).getTime()
+      const ms = t.firstRunAtMs
+      if (ms === undefined || ms === null) continue
       if (ms < min) min = ms
       if (ms > max) max = ms
     }
@@ -62,26 +49,24 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
     }
   }, [visibleTracks])
 
-  // Infinity = tout afficher (valeur stable côté SSR, jamais rendue dans le DOM)
   const [selectedDate, setSelectedDate] = useState<number>(Infinity)
-  // Rendu du slider uniquement côté client pour pouvoir utiliser Date.now() librement
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => { setMounted(true) }, [])
 
   useEffect(() => {
-    setSelectedDate(maxDate ?? Date.now())
+    if (maxDate != null) {
+      setSelectedDate(prev => prev === Infinity ? maxDate : prev)
+    }
   }, [maxDate])
 
-  // Fallbacks client-only (safe car utilisés seulement après montage)
-  const sliderMin = minDate ?? (Date.now() - 5 * 365 * 24 * 60 * 60 * 1000)
-  const sliderMax = maxDate ?? Date.now()
+  // Hydration-safe min/max: only use 'now' after mounting or for non-rendered initial values
+  const sliderMin = minDate ?? (now - 5 * 365 * 24 * 60 * 60 * 1000)
+  const sliderMax = maxDate ?? now
 
   const { runCount, coveredLengthM } = useMemo(() => {
     let count = 0
     let length = 0
     for (const t of visibleTracks) {
-      if (!t.firstRunAt || new Date(t.firstRunAt).getTime() <= selectedDate) {
+      // ⚡ Optimization: Use pre-calculated firstRunAtMs
+      if (!t.firstRunAtMs || t.firstRunAtMs <= selectedDate) {
         count++
         length += t.lengthM
       }
@@ -111,7 +96,9 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
     if (res.ok) handleStatusChange(await res.json())
   }, [handleStatusChange])
 
-  useEffect(() => { fetchStatus() }, [fetchStatus])
+  useEffect(() => {
+    fetchStatus()
+  }, [fetchStatus])
 
   useEffect(() => {
     const active = ['PENDING', 'RUNNING', 'COMPUTING_STREETS']
