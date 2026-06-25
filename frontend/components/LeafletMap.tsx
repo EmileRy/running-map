@@ -3,15 +3,7 @@
 import { useEffect, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-
-interface Track {
-  id: string
-  zone: string
-  name: string | null
-  coordinates: number[][]
-  firstRunAt: string | null
-  lastRunAt: string | null
-}
+import type { Track } from '@/types/track'
 
 interface PolylineEntry {
   polyline: L.Polyline
@@ -34,6 +26,7 @@ export default function LeafletMap({ tracks, selectedDate }: {
       center: [46.2276, 2.2137],
       zoom: 6,
       zoomControl: true,
+      preferCanvas: true, // Use Canvas renderer for better performance with many polylines
     })
 
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
@@ -75,7 +68,7 @@ export default function LeafletMap({ tracks, selectedDate }: {
       allBounds.push(polyline.getBounds())
       polylinesRef.current.push({
         polyline,
-        firstRunAt: track.firstRunAt ? new Date(track.firstRunAt).getTime() : null,
+        firstRunAt: track.firstRunAtMs ?? null,
       })
     }
 
@@ -89,11 +82,15 @@ export default function LeafletMap({ tracks, selectedDate }: {
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
-    for (const { polyline, firstRunAt } of polylinesRef.current) {
-      if (firstRunAt == null || firstRunAt <= selectedDate) {
-        if (!map.hasLayer(polyline)) polyline.addTo(map)
-      } else {
-        if (map.hasLayer(polyline)) polyline.remove()
+    // Manual loop for maximum performance during frequent slider updates
+    for (let i = 0; i < polylinesRef.current.length; i++) {
+      const { polyline, firstRunAt } = polylinesRef.current[i]
+      const visible = firstRunAt == null || firstRunAt <= selectedDate
+      const has = map.hasLayer(polyline)
+      if (visible && !has) {
+        polyline.addTo(map)
+      } else if (!visible && has) {
+        polyline.remove()
       }
     }
   }, [selectedDate])
