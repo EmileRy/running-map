@@ -2,28 +2,12 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/auth'
 import { MapLayout } from '@/components/MapLayout'
-
-interface Street {
-  id: string
-  zone: string
-  name: string | null
-  coordinates: number[][]
-  firstRunAt: string | null
-  lastRunAt: string | null
-  lengthM: number
-}
-
-interface Zone {
-  name: string
-  covered: number
-  total: number
-  totalLengthM: number
-  percentage: number
-}
+import { Track } from '@/types/track'
+import { Zone } from '@/types/zone'
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
 
-async function fetchCoveredStreets(token: string): Promise<Street[]> {
+async function fetchCoveredStreets(token: string): Promise<Track[]> {
   const res = await fetch(`${apiUrl}/api/streets/covered`, {
     headers: { Authorization: `Bearer ${token}` },
     cache: 'no-store',
@@ -52,7 +36,18 @@ export default async function MapPage() {
     fetchCoveredStreets(token),
     fetchZones(token),
   ])
-  const streetsWithCoords = streets.filter((s) => s.coordinates?.length >= 2)
 
-  return <MapLayout user={user} tracks={streetsWithCoords} zones={zones} />
+  // Pre-calculate numeric timestamps for O(1) comparison in the UI
+  // and filter out invalid tracks in a single pass
+  const tracks: Track[] = []
+  for (const s of streets) {
+    if (s.coordinates && s.coordinates.length >= 2) {
+      tracks.push({
+        ...s,
+        firstRunAtMs: s.firstRunAt ? new Date(s.firstRunAt).getTime() : null
+      })
+    }
+  }
+
+  return <MapLayout user={user} tracks={tracks} zones={zones} />
 }
