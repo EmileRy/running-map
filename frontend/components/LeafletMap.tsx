@@ -3,19 +3,11 @@
 import { useEffect, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-
-interface Track {
-  id: string
-  zone: string
-  name: string | null
-  coordinates: number[][]
-  firstRunAt: string | null
-  lastRunAt: string | null
-}
+import { Track } from '@/types/track'
 
 interface PolylineEntry {
   polyline: L.Polyline
-  firstRunAt: number | null // epoch ms, null = toujours visible
+  firstRunAtMs: number | null // epoch ms, null = toujours visible
 }
 
 export default function LeafletMap({ tracks, selectedDate }: {
@@ -34,6 +26,7 @@ export default function LeafletMap({ tracks, selectedDate }: {
       center: [46.2276, 2.2137],
       zoom: 6,
       zoomControl: true,
+      preferCanvas: true, // Use canvas for better performance with many polylines
     })
 
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
@@ -75,7 +68,7 @@ export default function LeafletMap({ tracks, selectedDate }: {
       allBounds.push(polyline.getBounds())
       polylinesRef.current.push({
         polyline,
-        firstRunAt: track.firstRunAt ? new Date(track.firstRunAt).getTime() : null,
+        firstRunAtMs: track.firstRunAtMs,
       })
     }
 
@@ -89,8 +82,8 @@ export default function LeafletMap({ tracks, selectedDate }: {
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
-    for (const { polyline, firstRunAt } of polylinesRef.current) {
-      if (firstRunAt == null || firstRunAt <= selectedDate) {
+    for (const { polyline, firstRunAtMs } of polylinesRef.current) {
+      if (firstRunAtMs == null || firstRunAtMs <= selectedDate) {
         if (!map.hasLayer(polyline)) polyline.addTo(map)
       } else {
         if (map.hasLayer(polyline)) polyline.remove()

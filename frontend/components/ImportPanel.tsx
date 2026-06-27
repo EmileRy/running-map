@@ -43,7 +43,13 @@ export function ImportPanel({ onStatusChange, onLoadingChange, tracksCount = 0, 
     if (res.ok) updateJob(await res.json())
   }, [updateJob])
 
-  useEffect(() => { fetchStatus() }, [fetchStatus])
+  useEffect(() => {
+    // Defer to avoid cascading render warning in React 19
+    const timeout = setTimeout(() => {
+      fetchStatus()
+    }, 0)
+    return () => clearTimeout(timeout)
+  }, [fetchStatus])
 
   useEffect(() => {
     const active: ImportStatus[] = ['PENDING', 'RUNNING', 'COMPUTING_STREETS']
