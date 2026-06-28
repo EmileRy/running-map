@@ -2,6 +2,7 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/auth'
 import { MapLayout } from '@/components/MapLayout'
+import { Track } from '@/types/track'
 
 interface Street {
   id: string
@@ -52,7 +53,13 @@ export default async function MapPage() {
     fetchCoveredStreets(token),
     fetchZones(token),
   ])
-  const streetsWithCoords = streets.filter((s) => s.coordinates?.length >= 2)
 
-  return <MapLayout user={user} tracks={streetsWithCoords} zones={zones} />
+  const tracks: Track[] = streets
+    .filter((s) => s.coordinates?.length >= 2)
+    .map((s) => ({
+      ...s,
+      firstRunAtMs: s.firstRunAt ? new Date(s.firstRunAt).getTime() : null,
+    }))
+
+  return <MapLayout user={user} tracks={tracks} zones={zones} />
 }
