@@ -3,15 +3,7 @@
 import { useEffect, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-
-interface Track {
-  id: string
-  zone: string
-  name: string | null
-  coordinates: number[][]
-  firstRunAt: string | null
-  lastRunAt: string | null
-}
+import { Track } from '@/types/track'
 
 interface PolylineEntry {
   polyline: L.Polyline
@@ -75,7 +67,7 @@ export default function LeafletMap({ tracks, selectedDate }: {
       allBounds.push(polyline.getBounds())
       polylinesRef.current.push({
         polyline,
-        firstRunAt: track.firstRunAt ? new Date(track.firstRunAt).getTime() : null,
+        firstRunAt: track.firstRunAtMs,
       })
     }
 
