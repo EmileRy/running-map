@@ -1,0 +1,12 @@
+
+> frontend@0.1.0 dev /app/frontend
+> next dev
+
+▲ Next.js 16.2.2 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.0.2:3000
+✓ Ready in 576ms
+
+ GET / 200 in 3.3s (next.js: 3.0s, application-code: 311ms)
+ GET /map 307 in 1541ms (next.js: 1323ms, application-code: 218ms)
+ GET / 200 in 142ms (next.js: 8ms, application-code: 134ms)

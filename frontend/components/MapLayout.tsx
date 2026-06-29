@@ -4,29 +4,13 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { MapView } from './MapView'
 import { ImportPanel, type ImportJob } from './ImportPanel'
+import type { Track } from '@/types/track'
+import type { Zone } from '@/types/zone'
 
 interface User {
   firstname: string
   lastname: string
   profilePicture?: string
-}
-
-interface Track {
-  id: string
-  zone: string
-  name: string | null
-  coordinates: number[][]
-  firstRunAt: string | null
-  lastRunAt: string | null
-  lengthM: number
-}
-
-interface Zone {
-  name: string
-  covered: number
-  total: number
-  totalLengthM: number
-  percentage: number
 }
 
 const fmt = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -51,8 +35,8 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
     let min = Infinity
     let max = -Infinity
     for (const t of visibleTracks) {
-      if (!t.firstRunAt) continue
-      const ms = new Date(t.firstRunAt).getTime()
+      if (t.firstRunAtMs === null) continue
+      const ms = t.firstRunAtMs
       if (ms < min) min = ms
       if (ms > max) max = ms
     }
@@ -81,7 +65,7 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
     let count = 0
     let length = 0
     for (const t of visibleTracks) {
-      if (!t.firstRunAt || new Date(t.firstRunAt).getTime() <= selectedDate) {
+      if (t.firstRunAtMs === null || t.firstRunAtMs <= selectedDate) {
         count++
         length += t.lengthM
       }
