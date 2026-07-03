@@ -43,7 +43,11 @@ export function ImportPanel({ onStatusChange, onLoadingChange, tracksCount = 0, 
     if (res.ok) updateJob(await res.json())
   }, [updateJob])
 
-  useEffect(() => { fetchStatus() }, [fetchStatus])
+  useEffect(() => {
+    setTimeout(() => {
+      fetchStatus()
+    }, 0)
+  }, [fetchStatus])
 
   useEffect(() => {
     const active: ImportStatus[] = ['PENDING', 'RUNNING', 'COMPUTING_STREETS']
