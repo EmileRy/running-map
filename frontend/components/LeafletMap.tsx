@@ -3,15 +3,7 @@
 import { useEffect, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-
-interface Track {
-  id: string
-  zone: string
-  name: string | null
-  coordinates: number[][]
-  firstRunAt: string | null
-  lastRunAt: string | null
-}
+import type { Track } from '@/types/track'
 
 interface PolylineEntry {
   polyline: L.Polyline
@@ -34,6 +26,7 @@ export default function LeafletMap({ tracks, selectedDate }: {
       center: [46.2276, 2.2137],
       zoom: 6,
       zoomControl: true,
+      preferCanvas: true, // Performance: Use Canvas instead of SVG for large number of polylines
     })
 
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
@@ -70,12 +63,12 @@ export default function LeafletMap({ tracks, selectedDate }: {
         color: '#FC4C02',
         weight: 2,
         opacity: 0.65,
-        smoothFactor: 1,
+        smoothFactor: 2, // Performance: simplify geometry for faster rendering
       }).addTo(map)
       allBounds.push(polyline.getBounds())
       polylinesRef.current.push({
         polyline,
-        firstRunAt: track.firstRunAt ? new Date(track.firstRunAt).getTime() : null,
+        firstRunAt: track.firstRunAtMs,
       })
     }
 
