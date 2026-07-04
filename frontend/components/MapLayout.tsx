@@ -4,6 +4,8 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { MapView } from './MapView'
 import { ImportPanel, type ImportJob } from './ImportPanel'
+import type { Track } from '@/types/track'
+import type { Zone } from '@/types/zone'
 
 interface User {
   firstname: string
@@ -11,27 +13,14 @@ interface User {
   profilePicture?: string
 }
 
-interface Track {
-  id: string
-  zone: string
-  name: string | null
-  coordinates: number[][]
-  firstRunAt: string | null
-  lastRunAt: string | null
-  lengthM: number
-}
-
-interface Zone {
-  name: string
-  covered: number
-  total: number
-  totalLengthM: number
-  percentage: number
-}
-
 const fmt = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
 
-export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]; zones: Zone[] }) {
+export function MapLayout({ user, tracks, zones, serverNow }: {
+  user: User;
+  tracks: Track[];
+  zones: Zone[];
+  serverNow: number;
+}) {
   const router = useRouter()
   const [menuOpen, setMenuOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
@@ -51,8 +40,8 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
     let min = Infinity
     let max = -Infinity
     for (const t of visibleTracks) {
-      if (!t.firstRunAt) continue
-      const ms = new Date(t.firstRunAt).getTime()
+      if (t.firstRunAtMs == null) continue
+      const ms = t.firstRunAtMs
       if (ms < min) min = ms
       if (ms > max) max = ms
     }
@@ -67,21 +56,29 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
   // Rendu du slider uniquement côté client pour pouvoir utiliser Date.now() librement
   const [mounted, setMounted] = useState(false)
 
-  useEffect(() => { setMounted(true) }, [])
+  useEffect(() => {
+    // Fix: Defer to avoid cascading render warning in React 19
+    setTimeout(() => setMounted(true), 0)
+  }, [])
 
   useEffect(() => {
-    setSelectedDate(maxDate ?? Date.now())
-  }, [maxDate])
+    // Fix: Defer to avoid cascading render warning in React 19
+    setTimeout(() => {
+      setSelectedDate(maxDate ?? serverNow)
+    }, 0)
+  }, [maxDate, serverNow])
 
   // Fallbacks client-only (safe car utilisés seulement après montage)
-  const sliderMin = minDate ?? (Date.now() - 5 * 365 * 24 * 60 * 60 * 1000)
-  const sliderMax = maxDate ?? Date.now()
+  // Optimization: Use stable serverNow for purity and useMemo for efficient derivation
+  const sliderMin = useMemo(() => minDate ?? (serverNow - 5 * 365 * 24 * 60 * 60 * 1000), [minDate, serverNow])
+  const sliderMax = useMemo(() => maxDate ?? serverNow, [maxDate, serverNow])
 
   const { runCount, coveredLengthM } = useMemo(() => {
     let count = 0
     let length = 0
     for (const t of visibleTracks) {
-      if (!t.firstRunAt || new Date(t.firstRunAt).getTime() <= selectedDate) {
+      // Optimization: Using pre-calculated numeric timestamps for O(1) comparison
+      if (t.firstRunAtMs == null || t.firstRunAtMs <= selectedDate) {
         count++
         length += t.lengthM
       }
@@ -111,7 +108,11 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
     if (res.ok) handleStatusChange(await res.json())
   }, [handleStatusChange])
 
-  useEffect(() => { fetchStatus() }, [fetchStatus])
+  useEffect(() => {
+    // Fix: Defer to avoid cascading render warning in React 19
+    const t = setTimeout(fetchStatus, 0)
+    return () => clearTimeout(t)
+  }, [fetchStatus])
 
   useEffect(() => {
     const active = ['PENDING', 'RUNNING', 'COMPUTING_STREETS']

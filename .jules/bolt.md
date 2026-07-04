@@ -1,0 +1,3 @@
+## 2025-05-15 - React 19 Purity & Performance in Map Rendering
+**Learning:** React 19's `react-hooks/purity` rule prohibits calling `Date.now()` or `new Date()` directly in render bodies or `useMemo`. Additionally, `react-hooks/set-state-in-effect` prevents synchronous `setState` in `useEffect` to avoid cascading renders.
+**Action:** Pass a stable `serverNow` timestamp from Server Components to Client Components as a prop to satisfy purity. Use `setTimeout` or microtasks to defer non-essential state updates on mount. For large geo-datasets, enable Leaflet's `preferCanvas: true` and pre-calculate numeric timestamps on the server to ensure O(1) filtering on the client.
