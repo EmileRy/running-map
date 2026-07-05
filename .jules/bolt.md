@@ -1,0 +1,3 @@
+## 2025-05-15 - [React 19] Avoid setTimeout to suppress cascading render warnings
+**Learning:** Using `setTimeout(() => setMounted(true), 0)` to avoid React 19's `react-hooks/set-state-in-effect` lint error is a performance anti-pattern. While it "silences" the warning, it artificially delays the component's interactivity by deferring the update to the next event loop tick.
+**Action:** Prefer deriving state directly during render if possible. If a sync state update in `useEffect` is truly necessary (e.g., for hydration or initial data fetch), use `// eslint-disable-next-line` with a comment rather than introducing artificial async delays.
