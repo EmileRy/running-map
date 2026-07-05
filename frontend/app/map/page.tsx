@@ -3,6 +3,17 @@ import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/auth'
 import { MapLayout } from '@/components/MapLayout'
 
+interface Track {
+  id: string
+  zone: string
+  name: string | null
+  coordinates: number[][]
+  firstRunAt: string | null
+  firstRunAtMs: number | null
+  lastRunAt: string | null
+  lengthM: number
+}
+
 interface Street {
   id: string
   zone: string
@@ -52,7 +63,15 @@ export default async function MapPage() {
     fetchCoveredStreets(token),
     fetchZones(token),
   ])
-  const streetsWithCoords = streets.filter((s) => s.coordinates?.length >= 2)
+  // In Server Components, Date.now() is acceptable for generating a stable timestamp for the current request
+  // eslint-disable-next-line react-hooks/purity
+  const serverNow = Date.now()
+  const tracks: Track[] = streets
+    .filter((s) => s.coordinates?.length >= 2)
+    .map((s) => ({
+      ...s,
+      firstRunAtMs: s.firstRunAt ? new Date(s.firstRunAt).getTime() : null,
+    }))
 
-  return <MapLayout user={user} tracks={streetsWithCoords} zones={zones} />
+  return <MapLayout user={user} tracks={tracks} zones={zones} serverNow={serverNow} />
 }
