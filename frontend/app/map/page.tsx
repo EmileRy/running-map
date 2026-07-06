@@ -52,7 +52,17 @@ export default async function MapPage() {
     fetchCoveredStreets(token),
     fetchZones(token),
   ])
-  const streetsWithCoords = streets.filter((s) => s.coordinates?.length >= 2)
 
-  return <MapLayout user={user} tracks={streetsWithCoords} zones={zones} />
+  // Optimization: Pre-calculate timestamps for numeric filtering (O(1) comparison in Client Components)
+  const streetsWithCoords = streets
+    .filter((s) => s.coordinates?.length >= 2)
+    .map(s => ({
+      ...s,
+      firstRunAtMs: s.firstRunAt ? new Date(s.firstRunAt).getTime() : null
+    }))
+
+  // eslint-disable-next-line react-hooks/purity
+  const serverNow = Date.now()
+
+  return <MapLayout user={user} tracks={streetsWithCoords} zones={zones} serverNow={serverNow} />
 }
