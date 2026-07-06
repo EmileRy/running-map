@@ -43,6 +43,7 @@ export function ImportPanel({ onStatusChange, onLoadingChange, tracksCount = 0, 
     if (res.ok) updateJob(await res.json())
   }, [updateJob])
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { fetchStatus() }, [fetchStatus])
 
   useEffect(() => {
