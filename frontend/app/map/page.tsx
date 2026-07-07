@@ -9,6 +9,7 @@ interface Street {
   name: string | null
   coordinates: number[][]
   firstRunAt: string | null
+  firstRunAtMs: number | null
   lastRunAt: string | null
   lengthM: number
 }
@@ -52,7 +53,16 @@ export default async function MapPage() {
     fetchCoveredStreets(token),
     fetchZones(token),
   ])
-  const streetsWithCoords = streets.filter((s) => s.coordinates?.length >= 2)
 
-  return <MapLayout user={user} tracks={streetsWithCoords} zones={zones} />
+  // eslint-disable-next-line react-hooks/purity
+  const serverNow = Date.now()
+
+  const streetsWithCoords = streets
+    .filter((s) => s.coordinates?.length >= 2)
+    .map(s => ({
+      ...s,
+      firstRunAtMs: s.firstRunAt ? new Date(s.firstRunAt).getTime() : null
+    }))
+
+  return <MapLayout user={user} tracks={streetsWithCoords} zones={zones} serverNow={serverNow} />
 }
