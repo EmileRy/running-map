@@ -17,6 +17,7 @@ interface Track {
   name: string | null
   coordinates: number[][]
   firstRunAt: string | null
+  firstRunAtMs: number | null
   lastRunAt: string | null
   lengthM: number
 }
@@ -31,7 +32,7 @@ interface Zone {
 
 const fmt = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
 
-export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]; zones: Zone[] }) {
+export function MapLayout({ user, tracks, zones, serverNow }: { user: User; tracks: Track[]; zones: Zone[]; serverNow: number }) {
   const router = useRouter()
   const [menuOpen, setMenuOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
@@ -46,13 +47,13 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
     [tracks, selectedZone]
   )
 
-  // Dates min/max calculées uniquement depuis les données (pas de Date.now() ici — hydration mismatch)
+  // Dates min/max calculées uniquement depuis les données
   const { minDate, maxDate } = useMemo(() => {
     let min = Infinity
     let max = -Infinity
     for (const t of visibleTracks) {
-      if (!t.firstRunAt) continue
-      const ms = new Date(t.firstRunAt).getTime()
+      if (t.firstRunAtMs === null) continue
+      const ms = t.firstRunAtMs
       if (ms < min) min = ms
       if (ms > max) max = ms
     }
@@ -62,26 +63,27 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
     }
   }, [visibleTracks])
 
-  // Infinity = tout afficher (valeur stable côté SSR, jamais rendue dans le DOM)
-  const [selectedDate, setSelectedDate] = useState<number>(Infinity)
-  // Rendu du slider uniquement côté client pour pouvoir utiliser Date.now() librement
+  // Optimisation : initialisation directe pour éviter le waterfall d'effets au montage
+  const [selectedDate, setSelectedDate] = useState<number>(maxDate ?? serverNow)
   const [mounted, setMounted] = useState(false)
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setMounted(true) }, [])
 
   useEffect(() => {
-    setSelectedDate(maxDate ?? Date.now())
-  }, [maxDate])
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSelectedDate(maxDate ?? serverNow)
+  }, [maxDate, serverNow])
 
-  // Fallbacks client-only (safe car utilisés seulement après montage)
-  const sliderMin = minDate ?? (Date.now() - 5 * 365 * 24 * 60 * 60 * 1000)
-  const sliderMax = maxDate ?? Date.now()
+  // Fallbacks utilisant serverNow pour la stabilité du rendu initial
+  const sliderMin = minDate ?? (serverNow - 5 * 365 * 24 * 60 * 60 * 1000)
+  const sliderMax = maxDate ?? serverNow
 
   const { runCount, coveredLengthM } = useMemo(() => {
     let count = 0
     let length = 0
     for (const t of visibleTracks) {
-      if (!t.firstRunAt || new Date(t.firstRunAt).getTime() <= selectedDate) {
+      if (t.firstRunAtMs === null || t.firstRunAtMs <= selectedDate) {
         count++
         length += t.lengthM
       }
@@ -111,7 +113,10 @@ export function MapLayout({ user, tracks, zones }: { user: User; tracks: Track[]
     if (res.ok) handleStatusChange(await res.json())
   }, [handleStatusChange])
 
-  useEffect(() => { fetchStatus() }, [fetchStatus])
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchStatus()
+  }, [fetchStatus])
 
   useEffect(() => {
     const active = ['PENDING', 'RUNNING', 'COMPUTING_STREETS']

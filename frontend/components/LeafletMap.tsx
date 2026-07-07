@@ -10,6 +10,7 @@ interface Track {
   name: string | null
   coordinates: number[][]
   firstRunAt: string | null
+  firstRunAtMs: number | null
   lastRunAt: string | null
 }
 
@@ -34,6 +35,7 @@ export default function LeafletMap({ tracks, selectedDate }: {
       center: [46.2276, 2.2137],
       zoom: 6,
       zoomControl: true,
+      preferCanvas: true, // Utilisation du Canvas pour gérer des milliers de polylines
     })
 
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
@@ -70,12 +72,12 @@ export default function LeafletMap({ tracks, selectedDate }: {
         color: '#FC4C02',
         weight: 2,
         opacity: 0.65,
-        smoothFactor: 1,
+        smoothFactor: 2, // Optimisation du rendu
       }).addTo(map)
       allBounds.push(polyline.getBounds())
       polylinesRef.current.push({
         polyline,
-        firstRunAt: track.firstRunAt ? new Date(track.firstRunAt).getTime() : null,
+        firstRunAt: track.firstRunAtMs,
       })
     }
 
